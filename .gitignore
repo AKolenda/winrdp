@@ -1,0 +1,15 @@
+/build/
+/dist/
+/logs/
+/src-tauri/target/
+/session/target/
+/src-tauri/gen/
+.env
+.env.*
+!.env.example
+*.log
+*.rdp
+__pycache__/
+*.pyc
+# Deliberately do NOT ignore Cargo.lock; preserve first successful resolution.
+/.layout-fix-backup/

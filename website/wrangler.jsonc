@@ -1,0 +1,12 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "winrdp",
+  "account_id": "704dbfe5d9c5a730e5ef427a1a7948f9",
+  "compatibility_date": "2026-09-11",
+  "workers_dev": true,
+  "routes": [{ "pattern": "winrdp.app", "custom_domain": true }],
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "404-page"
+  }
+}

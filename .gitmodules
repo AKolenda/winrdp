@@ -1,0 +1,4 @@
+[submodule "third_party/ironrdp"]
+	path = third_party/ironrdp
+	url = https://github.com/AKolenda/ironrdp-winrdp.git
+	branch = winrdp

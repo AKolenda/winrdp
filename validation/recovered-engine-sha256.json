@@ -1,0 +1,98 @@
+[
+  {
+    "path": "engine/src/core.cpp",
+    "sha256": "14bb71dc42196c226bed0e509398572da2c40aede19c6e8c742e21c671739965"
+  },
+  {
+    "path": "engine/src/core.hpp",
+    "sha256": "a26b5d9a727e1e5a15e8d956560fbea572937375d3dc379d6b6f5620ee3df153"
+  },
+  {
+    "path": "engine/src/credentials.cpp",
+    "sha256": "fa97804ea6e15581b9ab60757849b22a592e24d8f3b9c73a4f79697a7675d1ee"
+  },
+  {
+    "path": "engine/src/credentials.hpp",
+    "sha256": "c6d3bc97d5c5ac9b2dda99fc7cf05bb076031939cde84c315c70e9697de4d5ab"
+  },
+  {
+    "path": "engine/src/gpu_canvas.cpp",
+    "sha256": "bb1e357704ebbf99194e1e43a88dabcda96f7e72bb569c559d7bad089a177510"
+  },
+  {
+    "path": "engine/src/gpu_canvas.hpp",
+    "sha256": "9cd4e36fda27073b1e2f7b894ff8e1722980175ee247204b241c9e86c97e1eb4"
+  },
+  {
+    "path": "engine/src/graphics_options.cpp",
+    "sha256": "19599338d66674f76f13e1a0a2fa0b1c459abbbcdacc73015a3c9766a40e3dfb"
+  },
+  {
+    "path": "engine/src/graphics_options.hpp",
+    "sha256": "4f385a0ff7f52a9ada3b1a349f5cf15cba4d5ad778bdabdad59a7e145e6b5f72"
+  },
+  {
+    "path": "engine/src/main.cpp",
+    "sha256": "e8532d6ad2b3523e1cea8d6795bae28a5560199f06990f46c12e12c63615b654"
+  },
+  {
+    "path": "engine/src/main_window.cpp",
+    "sha256": "eac5cc4804fd5f682aacf251c73d1da7271e0c5d4778cef6e9a09deb322c3f92"
+  },
+  {
+    "path": "engine/src/main_window.hpp",
+    "sha256": "824e94f2ed03cb654a49ef6c3c2dcdbe19e157407b9e1a202383a0ad71587505"
+  },
+  {
+    "path": "engine/src/profile.cpp",
+    "sha256": "3db0e3332b2615cd64470b849c2b7b451cf8a69dd38d5fc76f387b34b8341a3a"
+  },
+  {
+    "path": "engine/src/profile.hpp",
+    "sha256": "b2e38d63bb2f305037cf79b536721152c57dd5c372931ea0b1b23c3955dc8f28"
+  },
+  {
+    "path": "engine/src/rdp_session.cpp",
+    "sha256": "fdd030e4877213b819ef18543b92c0bf30ee3d2291e27e4dbc5e43a27795311b"
+  },
+  {
+    "path": "engine/src/rdp_session.hpp",
+    "sha256": "d414a7a5cd3b7da82b30e051025bff349bac47d06ad8b9acd7d7c6339b711300"
+  },
+  {
+    "path": "engine/src/rdp_view.cpp",
+    "sha256": "941c51a2e30c95f0bf93d40d5b8ca6cec508b22c24133c5969594093242ee50b"
+  },
+  {
+    "path": "engine/src/rdp_view.hpp",
+    "sha256": "8eb78e8f730eafd52c95db1fe14e7d3654531f0581d86708005b108145f8c859"
+  },
+  {
+    "path": "engine/src/session_window.cpp",
+    "sha256": "505f613794ad847fcebc428707687e62f6655d9afe206d00994e21902bee87d7"
+  },
+  {
+    "path": "engine/src/session_window.hpp",
+    "sha256": "3744040ac697e0cc8d57cf33cd93ce1626457f84e1abdb76fcbf6c241d726987"
+  },
+  {
+    "path": "engine/src/theme.cpp",
+    "sha256": "a105f2b95d8dd8cce14db7edb39316176cc86623a3891a3e85b064400fcc2e93"
+  },
+  {
+    "path": "engine/src/theme.hpp",
+    "sha256": "373d04e7cc874f0d9b7ed3e159ed1c2607179128b1249d7edee8df209c36d9c8"
+  },
+  {
+    "path": "engine/src/window_chrome.cpp",
+    "sha256": "b21942217a7a8c2040d9dd347c4767b9833dd22ca2c4038410657b644cd64621"
+  },
+  {
+    "path": "engine/src/window_chrome.hpp",
+    "sha256": "bd3aacf3a4839e98a90616b9a3b1ea363807457cdce43b5837ffcb610c9e9b20"
+  },
+  {
+    "path": "engine/src/window_geometry.hpp",
+    "sha256": "b82e28e3a44eb646a73cf462501f54791b2baa168e559f6f15b6830d4a8c1558"
+  }
+]

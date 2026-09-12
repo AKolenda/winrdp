@@ -1,0 +1,181 @@
+--- a/libfreerdp/codec/h264_ffmpeg.c
++++ b/libfreerdp/codec/h264_ffmpeg.c
+@@ -24,6 +24,9 @@
+ #include <freerdp/log.h>
+ #include <freerdp/codec/h264.h>
+ #include <libavcodec/avcodec.h>
++#include <stdlib.h>
++#include <stdio.h>
++#include <string.h>
+ #include <libavutil/opt.h>
+ #include <libswscale/swscale.h>
+ 
+@@ -366,6 +369,7 @@
+ 	AVCodecContext* codecEncoderContext;
+ 	AVCodecParserContext* codecParser;
+ 	AVFrame* videoFrame;
++	BOOL winrdp_hw_reported;
+ #if LIBAVCODEC_VERSION_INT < AV_VERSION_INT(58, 133, 100)
+ 	AVPacket bufferpacket;
+ #endif
+@@ -646,7 +650,7 @@
+ 		AVFrame* target = sys->videoFrame;
+ 		if (sys->hwFrameSupportsNativeFormat < 0)
+ 		{
+-			const int res = hw_supports_target_format(sys->codecDecoderContext->hw_frames_ctx,
++			const int res = hw_supports_target_format(sys->hwVideoFrame->hw_frames_ctx,
+ 			                                          sys->videoFrame->format);
+ 			if (res < 0)
+ 				status = res;
+@@ -686,7 +690,14 @@
+ 			goto fail;
+ 		}
+ 
+-		if (gotFrame && (target != sys->videoFrame))
++
++        if (gotFrame && !sys->winrdp_hw_reported && sys->hwVideoFrame->format == sys->hw_pix_fmt)
++        {
++            sys->winrdp_hw_reported = TRUE;
++            WLog_Print(h264->log,WLOG_INFO,"WinRDP H264: hardware frame decoded (%s)",
++                       sys->hw_pix_fmt == AV_PIX_FMT_CUDA ? "CUDA/NVDEC" : "VA-API");
++        }
++        if (gotFrame && (target != sys->videoFrame))
+ 		{
+ 			if (!sys->swsctx)
+ 			{
+@@ -1070,6 +1081,70 @@
+ }
+ #endif
+ 
++
++/* WinRDP private patch: winrdp-hwdecode-1. Hardware decoding is opt-in. */
++#ifdef WITH_VAAPI
++static BOOL winrdp_try_decoder(H264_CONTEXT* h264, enum AVHWDeviceType type,
++                               enum AVPixelFormat format, const char* device)
++{
++    H264_CONTEXT_LIBAVCODEC* sys = (H264_CONTEXT_LIBAVCODEC*)h264->pSystemData;
++    BOOL supported = FALSE;
++    for (int i = 0; ; ++i)
++    {
++        const AVCodecHWConfig* config = avcodec_get_hw_config(sys->codecDecoder, i);
++        if (!config) break;
++        if ((config->methods & AV_CODEC_HW_CONFIG_METHOD_HW_DEVICE_CTX) &&
++            config->device_type == type && config->pix_fmt == format)
++        { supported = TRUE; break; }
++    }
++    if (!supported) return FALSE;
++    const int rc = av_hwdevice_ctx_create(&sys->hwctx, type, device, nullptr, 0);
++    if (rc < 0)
++    {
++        av_buffer_unref(&sys->hwctx);
++        return FALSE;
++    }
++    sys->codecDecoderContext->hw_device_ctx = av_buffer_ref(sys->hwctx);
++    if (!sys->codecDecoderContext->hw_device_ctx)
++    { av_buffer_unref(&sys->hwctx); return FALSE; }
++    sys->hwFrameSupportsNativeFormat = -1;
++    sys->hw_pix_fmt = format;
++    sys->codecDecoderContext->get_format = libavcodec_get_format;
++    sys->codecDecoderContext->opaque = (void*)h264;
++    WLog_Print(h264->log, WLOG_INFO, "WinRDP H264: initialized %s device %s (awaiting decoded frame)",
++               av_hwdevice_get_type_name(type), device ? device : "default");
++    return TRUE;
++}
++static void winrdp_select_decoder(H264_CONTEXT* h264)
++{
++    const char* mode = getenv("WINRDP_HWDECODER");
++    if (!mode || strcmp(mode,"software") == 0) return;
++    const BOOL automatic = strcmp(mode,"auto") == 0;
++    if ((automatic || strcmp(mode,"cuda") == 0) &&
++        winrdp_try_decoder(h264,AV_HWDEVICE_TYPE_CUDA,AV_PIX_FMT_CUDA,
++                           getenv("WINRDP_CUDA_DEVICE"))) return;
++    if (automatic || strcmp(mode,"vaapi") == 0)
++    {
++        const char* explicitDevice = getenv("FREERDP_VAAPI_DEVICE");
++        if (explicitDevice && explicitDevice[0])
++        {
++            if (winrdp_try_decoder(h264,AV_HWDEVICE_TYPE_VAAPI,AV_PIX_FMT_VAAPI,explicitDevice)) return;
++        }
++        else
++        {
++            /* Enumerate render nodes rather than assuming the usable GPU is 128. */
++            for (int node = 128; node < 144; ++node)
++            {
++                char path[64] = {0};
++                (void)snprintf(path,sizeof(path),"/dev/dri/renderD%d",node);
++                if (winrdp_try_decoder(h264,AV_HWDEVICE_TYPE_VAAPI,AV_PIX_FMT_VAAPI,path)) return;
++            }
++        }
++    }
++    WLog_Print(h264->log,WLOG_WARN,"WinRDP H264: no requested hardware device initialized; using software FFmpeg");
++}
++#endif
++
+ static BOOL libavcodec_init(H264_CONTEXT* h264)
+ {
+ 	WINPR_ASSERT(h264);
+@@ -1113,33 +1188,7 @@
+ #endif
+ 
+ #ifdef WITH_VAAPI
+-		sys->hwFrameSupportsNativeFormat = -1;
+-		if (!sys->hwctx)
+-		{
+-			int ret = av_hwdevice_ctx_create(&sys->hwctx, AV_HWDEVICE_TYPE_VAAPI,
+-			                                 get_vaapi_device(), nullptr, 0);
+-
+-			if (ret < 0)
+-			{
+-				WLog_Print(
+-				    h264->log, WLOG_ERROR,
+-				    "Could not initialize hardware decoder for %s, falling back to software: %s",
+-				    get_vaapi_device(), av_err2str(ret));
+-				sys->hwctx = nullptr;
+-				goto fail_hwdevice_create;
+-			}
+-		}
+-		WLog_Print(h264->log, WLOG_INFO, "Using VAAPI [%s|%s] for accelerated H264 decoding",
+-		           get_vaapi_device(), vaapi_vendor(sys->hwctx));
+-
+-		sys->codecDecoderContext->get_format = libavcodec_get_format;
+-		sys->hw_pix_fmt = AV_PIX_FMT_VAAPI;
+-#if LIBAVCODEC_VERSION_INT >= AV_VERSION_INT(57, 80, 100)
+-		sys->codecDecoderContext->hw_device_ctx = av_buffer_ref(sys->hwctx);
+-#endif
+-		sys->codecDecoderContext->opaque = (void*)h264;
+-
+-	fail_hwdevice_create:
++        winrdp_select_decoder(h264);
+ #endif
+ 
+ #ifdef WITH_VIDEOTOOLBOX
+--- a/libfreerdp/codec/h264.c
++++ b/libfreerdp/codec/h264.c
+@@ -1,3 +1,5 @@
++#include <stdlib.h>
++#include <string.h>
+ /**
+  * FreeRDP: A Remote Desktop Protocol Implementation
+  * H.264 Bitmap Compression
+@@ -756,6 +758,21 @@
+ 	if (!InitOnceExecuteOnce(&subsystems_once, h264_register_subsystems, nullptr, nullptr))
+ 		return FALSE;
+ 
++
++#ifdef WITH_VIDEO_FFMPEG
++    /* WinRDP private patch: winrdp-hwdecode-1. Preserve upstream default order. */
++    const char* requested = getenv("WINRDP_HWDECODER");
++    if (!h264->Compressor && requested &&
++        (strcmp(requested,"auto") == 0 || strcmp(requested,"cuda") == 0 || strcmp(requested,"vaapi") == 0))
++    {
++        if (g_Subsystem_libavcodec.Init(h264))
++        {
++            h264->subsystem = &g_Subsystem_libavcodec;
++            return TRUE;
++        }
++    }
++#endif
++
+ 	for (size_t i = 0; i < MAX_SUBSYSTEMS; i++)
+ 	{
+ 		const H264_CONTEXT_SUBSYSTEM* subsystem = subSystems[i];

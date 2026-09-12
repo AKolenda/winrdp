@@ -1,0 +1,29 @@
+[
+  {
+    "component": "qtbase",
+    "version": "6.11.2",
+    "archive": "qtbase-everywhere-src-6.11.2.tar.xz",
+    "sha256": "5b2e00eccaf5a4d8c14134ffa0ea8dfd0a35ae1ffc7f8d87fa4305a1ed23cf22",
+    "compared_files": 22857,
+    "modified_files": [],
+    "missing_files": [],
+    "notice_files": 154,
+    "source_url": "https://download.qt.io/archive/qt/6.11/6.11.2/submodules/qtbase-everywhere-src-6.11.2.tar.xz"
+  },
+  {
+    "component": "freerdp",
+    "version": "3.31.1",
+    "archive": "freerdp-3.31.1.tar.gz",
+    "sha256": "4a2629026896cb4e26fb8ed2d6ca6aa4ab89ca95528dfbae2550c2f6bc866991",
+    "compared_files": 2944,
+    "modified_files": [
+      "libfreerdp/codec/h264_ffmpeg.c",
+      "libfreerdp/codec/h264.c"
+    ],
+    "missing_files": [],
+    "notice_files": 2,
+    "source_url": "https://pub.freerdp.com/releases/freerdp-3.31.1.tar.gz",
+    "patch": "runtime-patches/freerdp-3.31.1.patch",
+    "patch_sha256": "3f6bdc14bb52ceb347018c92cd77de24204fa2e0fc954140d02702639252fdc8"
+  }
+]

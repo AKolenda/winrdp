@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Win RDP is an open-source Remote Desktop client for Linux, built with Rust and IronRDP. Connect directly to Windows. Get packages and release notes on GitHub.">
+  <meta name="theme-color" content="#123fc6">
+  <meta property="og:title" content="Win RDP — Windows desktops, from Linux">
+  <meta property="og:description" content="A focused Remote Desktop client for Linux. Built with Rust and IronRDP. Releases live on GitHub.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://winrdp.app/">
+  <link rel="canonical" href="https://winrdp.app/">
+  <title>Win RDP — Windows desktops, from Linux</title>
+  <link rel="icon" href="/assets/winrdp.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="header wrap">
+    <a class="brand" href="/" aria-label="Win RDP home"><img src="/assets/winrdp.svg" width="36" height="36" alt="">Win RDP</a>
+    <nav aria-label="Main navigation"><a href="#client">The client</a><a href="https://github.com/AKolenda/winrdp/blob/master/BUILDING.md">Documentation</a><a href="https://github.com/AKolenda/winrdp">GitHub <span aria-hidden="true">↗</span></a></nav>
+  </header>
+  <main id="main">
+    <section class="hero">
+      <div class="hero-inner wrap">
+        <div class="hero-copy">
+          <h1>Windows desktops.<br>From Linux.</h1>
+          <p class="lead">The computer you need, on the desktop you choose. A focused RDP client with familiar controls and a native window for every connection.</p>
+          <a class="button primary" href="https://github.com/AKolenda/winrdp/releases"><svg aria-hidden="true" viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5"/></svg>View GitHub releases</a>
+          <p class="release-note">For Linux x86_64. Early development.<br>Packages, checksums, and release notes live on GitHub.</p>
+        </div>
+        <figure class="launcher"><img src="/assets/launcher.png" alt="Win RDP’s simple launcher, with an IP address field and a list of saved computers" width="480" height="600"><figcaption>The simple launcher. Pick a computer and connect.</figcaption></figure>
+      </div>
+    </section>
+    <section class="client wrap" id="client">
+      <div class="section-intro"><h2>A small client.<br>A proper remote desktop.</h2><p>Connect directly over your LAN or VPN. Your session goes to your Windows computer, with no Win RDP account or relay in between.</p></div>
+      <div class="details">
+        <article><h3>One window per computer</h3><p>Keep saved computers close. Open separate session windows, resize your desktop, or switch to full screen with the connection bar within reach.</p></article>
+        <article><h3>Built on IronRDP</h3><p>A Rust session engine with an experimental reliable UDP transport and automatic TCP fallback. See the fork for the protocol work behind the client.</p><a href="https://github.com/AKolenda/ironrdp-winrdp/tree/winrdp">Explore the IronRDP fork</a></article>
+        <article><h3>Choose what you share</h3><p>Per-computer controls for clipboard, remote audio, microphone, and printer redirection. Availability depends on your desktop and the Windows host’s settings.</p></article>
+      </div>
+    </section>
+    <section class="open-source wrap">
+      <div><h2>Open source.<br>Open for contributions.</h2><p>Read the code, build the client, or report something that needs attention. Win RDP is in active development; check the release notes before installing.</p></div>
+      <div class="source-links"><a href="https://github.com/AKolenda/winrdp">Browse the source <span aria-hidden="true">↗</span></a><a href="https://github.com/AKolenda/winrdp/blob/master/BUILDING.md">Build it yourself <span aria-hidden="true">↗</span></a><a href="https://github.com/AKolenda/winrdp/issues">Report an issue <span aria-hidden="true">↗</span></a></div>
+    </section>
+  </main>
+  <footer class="footer wrap"><a class="brand" href="/"><img src="/assets/winrdp.svg" width="25" height="25" alt="">Win RDP</a><p>Independent software. Not affiliated with Microsoft.</p><a href="https://github.com/AKolenda/winrdp/blob/master/LICENSE">GNU AGPL v3.0</a></footer>
+</body>
+</html>

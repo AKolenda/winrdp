@@ -1,0 +1,12 @@
+{
+  "name": "winrdp-website",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "wrangler dev",
+    "build": "node build.mjs",
+    "deploy": "npm run build && wrangler deploy",
+    "prototype": "python3 -m http.server 8090 --bind 127.0.0.1"
+  },
+  "devDependencies": { "wrangler": "4.131.1" }
+}

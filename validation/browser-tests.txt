@@ -1,0 +1,23 @@
+{
+  "checks_passed": 17,
+  "checks": [
+    "preview sample rows",
+    "filter",
+    "custom display menu",
+    "save computer",
+    "user content is literal",
+    "browser cannot connect",
+    "settings page",
+    "dark switch",
+    "startup switch",
+    "no JS errors in preview",
+    "no network requests",
+    "certificate prompt surfaced",
+    "password field cleared",
+    "native select requested",
+    "fullscreen command",
+    "disconnect command",
+    "no JS errors in contract simulation"
+  ],
+  "scope": "Chromium local-content injection (asset URLs replaced with data URLs) and mocked command contract; not native Tauri/GTK/RDP"
+}

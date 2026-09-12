@@ -1,0 +1,21 @@
+Win RDP Next 0.6.1 build preflight
+Native runtime: system packages
+  openssl: 3.5.6
+
+Build has not started:
+  Missing tool: cargo
+  Missing tool: rustc
+  Missing tool: patchelf
+  Missing development package: gtk+-3.0
+  Missing development package: webkit2gtk-4.1
+  Missing development package: Qt6Core
+  Missing development package: Qt6Gui
+  Missing development package: Qt6Network
+  Missing development package: freerdp3
+  Missing development package: freerdp-client3
+  Missing development package: winpr3
+
+Run bash scripts/install-build-deps.sh and install Rust with rustup (see BUILDING.md).
+Keep your existing ~/.local/share/velordp/runtimes directory. No files there were changed.
+Build stopped (exit 2). Log: /mnt/data/WinRDP-Tauri-0.6.1/logs/build-20260907-035058.log
+No existing Win RDP installation was changed.

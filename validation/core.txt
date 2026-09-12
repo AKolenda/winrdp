@@ -1,0 +1,50 @@
+-- The CXX compiler identification is GNU 14.2.0
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: /usr/bin/c++ - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD - Success
+-- Found Threads: TRUE
+-- Configuring done (0.4s)
+-- Generating done (0.0s)
+-- Build files have been written to: /mnt/data/WinRDP-Tauri-0.6.1/build/core
+[1/6] Building CXX object CMakeFiles/geometry_tests.dir/mnt/data/WinRDP-Tauri-0.6.1/tests/geometry_tests.cpp.o
+[2/6] Linking CXX executable geometry_tests
+[3/6] Building CXX object CMakeFiles/core_tests.dir/mnt/data/WinRDP-Tauri-0.6.1/tests/core_tests.cpp.o
+[4/6] Building CXX object CMakeFiles/winrdp_core.dir/mnt/data/WinRDP-Tauri-0.6.1/engine/src/core.cpp.o
+[5/6] Linking CXX static library libwinrdp_core.a
+[6/6] Linking CXX executable core_tests
+Internal ctest changing into directory: /mnt/data/WinRDP-Tauri-0.6.1/build/core
+UpdateCTestConfiguration  from :/mnt/data/WinRDP-Tauri-0.6.1/build/core/DartConfiguration.tcl
+Parse Config file:/mnt/data/WinRDP-Tauri-0.6.1/build/core/DartConfiguration.tcl
+UpdateCTestConfiguration  from :/mnt/data/WinRDP-Tauri-0.6.1/build/core/DartConfiguration.tcl
+Parse Config file:/mnt/data/WinRDP-Tauri-0.6.1/build/core/DartConfiguration.tcl
+Test project /mnt/data/WinRDP-Tauri-0.6.1/build/core
+Constructing a list of tests
+Done constructing a list of tests
+Updating test list for fixtures
+Added 0 tests to meet fixture requirements
+Checking test dependency graph...
+Checking test dependency graph end
+test 1
+    Start 1: core
+
+1: Test command: /mnt/data/WinRDP-Tauri-0.6.1/build/core/core_tests
+1: Working Directory: /mnt/data/WinRDP-Tauri-0.6.1/build/core
+1: Test timeout computed to be: 1500
+1: 174 checks passed.
+1/2 Test #1: core .............................   Passed    0.02 sec
+test 2
+    Start 2: geometry
+
+2: Test command: /mnt/data/WinRDP-Tauri-0.6.1/build/core/geometry_tests
+2: Working Directory: /mnt/data/WinRDP-Tauri-0.6.1/build/core
+2: Test timeout computed to be: 1500
+2: 55 geometry scenarios passed (mathematical placement, not a window-manager test).
+2/2 Test #2: geometry .........................   Passed    0.00 sec
+
+100% tests passed, 0 tests failed out of 2
+
+Total Test time (real) =   0.02 sec

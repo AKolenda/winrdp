@@ -1,0 +1,56 @@
+[package]
+name = "winrdp-session"
+version = "0.7.4"
+edition = "2024"
+description = "Win RDP session window: one IronRDP-powered process per remote desktop"
+license = "AGPL-3.0-only"
+publish = false
+default-run = "winrdp-session"
+
+[lib]
+doctest = false
+test = false
+
+[[bin]]
+name = "winrdp-session"
+path = "src/main.rs"
+test = false
+
+[features]
+default = ["rustls", "wayland", "x11"]
+# Which winit backends the session window identity (`app_id` / `WM_CLASS`) is set on.
+wayland = ["winit/wayland"]
+x11 = ["winit/x11"]
+rustls = ["ironrdp/rustls"]
+native-tls = ["ironrdp/native-tls"]
+
+[dependencies]
+# Our fork (third_party/ironrdp, branch winrdp) of IronRDP at the reliable RDP-UDP2 commit.
+ironrdp-daemon = { path = "../third_party/ironrdp/crates/ironrdp-daemon" }
+ironrdp-rpc = { path = "../third_party/ironrdp/crates/ironrdp-rpc" }
+ironrdp = { path = "../third_party/ironrdp/crates/ironrdp", features = ["connector", "cliprdr", "input", "pdu", "client", "client-all", "client-vmconnect"] }
+ironrdp-cfg = { path = "../third_party/ironrdp/crates/ironrdp-cfg" }
+ironrdp-propertyset = { path = "../third_party/ironrdp/crates/ironrdp-propertyset" }
+ironrdp-rdpfile = { path = "../third_party/ironrdp/crates/ironrdp-rdpfile" }
+ironrdp-rdpdr-native = { path = "../third_party/ironrdp/crates/ironrdp-rdpdr-native" }
+winit = { version = "0.30", features = ["rwh_06", "wayland", "x11"] }
+png = "0.18"
+softbuffer = "0.4"
+clap = { version = "4.6", features = ["derive", "cargo", "env"] }
+inquire = "0.9"
+proc-exit = "2"
+tracing = { version = "0.1", features = ["log"] }
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tokio = { version = "1", features = ["full"] }
+whoami = "2.1"
+anyhow = "1"
+smallvec = "1.15"
+tap = "1"
+semver = "1"
+raw-window-handle = "0.6"
+url = "2"
+ab_glyph = "0.2"
+
+[profile.release]
+strip = "debuginfo"
+lto = "thin"
