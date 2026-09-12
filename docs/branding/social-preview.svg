@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640">
+<title>Win RDP — Built for speed. Designed for Linux.</title>
+<rect width="1280" height="640" fill="#123fc6"/>
+<rect x="72" y="156" width="260" height="280" rx="32" fill="#ffffff"/>
+<svg x="90" y="178" width="220" height="240" viewBox="0 0 48 48"><defs><linearGradient id="logoBlue" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#53b3ff"/><stop offset="1" stop-color="#0b65d8"/></linearGradient></defs><rect x="4" y="5" width="35" height="27" rx="5" fill="url(#logoBlue)"/><rect x="7" y="8" width="29" height="20" rx="2" fill="#eff8ff"/><path d="M22 32v7m-8 2h16" stroke="#0878e7" stroke-width="3" stroke-linecap="round"/><circle cx="35" cy="34" r="11" fill="#f8fcff" stroke="#a2c5eb"/><path d="m33 29-4 5 4 4m4-9 4 5-4 4" fill="none" stroke="#0878e7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+<g font-family="DejaVu Sans, sans-serif" fill="#ffffff">
+<text x="392" y="206" font-size="74" font-weight="bold">Win RDP</text>
+<text x="396" y="285" font-size="39">Built for speed.</text>
+<text x="396" y="340" font-size="39">Designed for Linux.</text>
+<text x="396" y="418" font-size="25" fill="#e4eaff">UDP v1, v2, and v3. Powered by Rust.</text>
+<text x="396" y="458" font-size="21" fill="#e4eaff">Experimental UDP support · IronRDP engine</text>
+<text x="76" y="562" font-size="24">winrdp.app</text>
+<text x="760" y="562" font-size="24">github.com/AKolenda/winrdp</text>
+</g></svg>
