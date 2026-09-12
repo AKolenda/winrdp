@@ -1,3 +1,5 @@
+<p align="center"><img src="docs/branding/app-icon.png" width="128" height="128" alt="Win RDP app logo"></p>
+
 # Win RDP
 
 **Built for speed. Designed for Linux.**
