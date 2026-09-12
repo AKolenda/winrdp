@@ -1,8 +1,8 @@
 [package]
 name = "winrdp-next"
-version = "0.7.4"
+version = "0.7.5"
 edition = "2021"
-description = "Win RDP experimental Tauri migration with a native FreeRDP surface"
+description = "Win RDP launcher with a native FreeRDP surface"
 license = "AGPL-3.0-only"
 publish = false
 

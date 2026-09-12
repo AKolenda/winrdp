@@ -89,7 +89,7 @@ See [BUILDING.md](BUILDING.md) for prerequisites. Then:
 
 ```sh
 bash scripts/build-deb.sh
-sudo apt install ./dist/winrdp-next_0.7.4_amd64.deb
+sudo apt install ./dist/winrdp-next_0.7.5_amd64.deb
 ```
 
 The package installs `winrdp-next` (the launcher) and `winrdp-session` (one process per

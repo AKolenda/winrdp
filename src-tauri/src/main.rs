@@ -212,7 +212,7 @@ async fn bootstrap(window: WebviewWindow, app: tauri::AppHandle) -> Result<Value
     trusted(&window)?;
     let library = { let store = app.state::<Store>(); let _guard = store.lock.lock().map_err(|_| "Library lock failed")?; store.load()? };
     let info = native(&window, "info", json!({}), None).await?;
-    Ok(json!({"library": library, "native": info, "version": "0.7.4", "engine": engine(),
+    Ok(json!({"library": library, "native": info, "version": "0.7.5", "engine": engine(),
         "user": std::env::var("USER").unwrap_or_default()}))
 }
 #[tauri::command]
@@ -384,7 +384,7 @@ async fn quit(window: WebviewWindow, app: tauri::AppHandle) -> Result<(), String
     Err("A connection is still shutting down. Wait a moment, then close again.".into())
 }
 fn main() {
-    if std::env::args().any(|a| a == "--version") { println!("Win RDP Next 0.7.4 (migration preview)"); return; }
+    if std::env::args().any(|a| a == "--version") { println!("Win RDP 0.7.5"); return; }
     // This recovery build establishes a software baseline, not an experimental GPU release.
     std::env::set_var("WINRDP_HWDECODER", "software");
     tauri::Builder::default()

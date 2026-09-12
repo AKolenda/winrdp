@@ -5,5 +5,5 @@
   <metadata_license>CC0-1.0</metadata_license><project_license>AGPL-3.0-only</project_license>
   <launchable type="desktop-id">io.winrdp.Next.desktop</launchable>
   <description><p>Connect to Windows computers on your LAN or VPN using IronRDP session windows and a local Tauri interface, with a classic FreeRDP engine available.</p><p>This is independent software, not a Microsoft product. Features and supported environments are documented in the project repository.</p></description>
-  <releases><release version="0.7.4" date="2026-09-11"/></releases>
+  <releases><release version="0.7.5" date="2026-09-12"/></releases>
 </component>
