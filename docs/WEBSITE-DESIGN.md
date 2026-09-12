@@ -9,11 +9,13 @@ and a developer handbook with a fixed sidebar. The split layout is the selected
 implementation: it presents the real client and the release link together in the
 first viewport, while keeping build and contribution information below.
 
-Design tokens: Windows blue `#123fc6`, ink `#192b47`, secondary text `#53637a`,
-paper `#ffffff`, separator `#d8e0ed`, and soft background `#eff3fa`.
+Design tokens: Windows blue `#123fc6`, deep blue `#0b2c92`, ink `#172842`,
+secondary text `#56657a`, paper `#ffffff`, and technical canvas `#f2f5fa`.
 Typography uses Aptos/Segoe UI with system fallbacks. The launcher screenshot is
-the characteristic visual; no stock illustration or decorative dashboard is used.
-The site requires no client JavaScript.
+the characteristic visual, placed on a dotted guided-tour board. Pink, violet,
+and mint cursors move through the real three-step workflow—address, computer,
+connect—with click rings at each target. Motion is CSS-only and disabled for
+people who prefer reduced motion; the site requires no client JavaScript.
 
 The primary-source prototype is preserved on the `prototype/release-website`
 branch. Run `cd website && npm run prototype`, then open

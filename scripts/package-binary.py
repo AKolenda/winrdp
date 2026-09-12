@@ -9,7 +9,7 @@ from __future__ import annotations
 import argparse, hashlib, json, os, re, shutil, subprocess, sys, tempfile
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
-VERSION='0.7.4'
+VERSION='0.7.5'
 
 def command(args, *, cwd=None, env=None):
     result=subprocess.run([str(a) for a in args],cwd=cwd,env=env,text=True,
@@ -109,14 +109,14 @@ def package(binary, runtime, output, session=None):
         # runtime libraries have no shlibs entries; their system dependencies are
         # inspected explicitly below. Every non-private ELF dependency was checked
         # for a dpkg owner above before --ignore-missing-info is used.
-        write(temp/'debian/control','Source: winrdp-next\nSection: net\nPriority: optional\nMaintainer: Win RDP project <build@localhost>\n\nPackage: winrdp-next\nArchitecture: any\nDescription: Win RDP migration preview\n')
+        write(temp/'debian/control','Source: winrdp-next\nSection: net\nPriority: optional\nMaintainer: Win RDP project <build@localhost>\n\nPackage: winrdp-next\nArchitecture: any\nDescription: Win RDP desktop client\n')
         elves=[installed]+([session_installed] if session_installed else [])+[private/name for name in private_sources]+[dest for _,dest in plugin_sources]
         result=command(['dpkg-shlibdeps','-O','--ignore-missing-info',f'-l{private}']+['-e'+str(p) for p in elves],cwd=temp,env=clean_env)
         deps=next((line.partition('=')[2] for line in result.splitlines() if line.startswith('shlibs:Depends=')),None)
         if not deps or 'libc6' not in deps or 'libwebkit2gtk-4.1-0' not in deps:
             raise RuntimeError('Could not derive complete runtime dependencies; refusing to create .deb.\n'+result)
         size=sum(p.stat().st_size for p in stage.rglob('*') if p.is_file())//1024
-        write(stage/'DEBIAN/control',f'Package: winrdp-next\nVersion: {VERSION}\nArchitecture: {arch}\nSection: net\nPriority: optional\nMaintainer: Win RDP project <build@localhost>\nInstalled-Size: {size}\nDepends: {deps}, fonts-dejavu-core\nDescription: Win RDP Next experimental Tauri client\n Native FreeRDP session engine and GTK desktop surface with a local HTML interface.\n This is a migration preview, not the classic client or an RDP host service.\n')
+        write(stage/'DEBIAN/control',f'Package: winrdp-next\nVersion: {VERSION}\nArchitecture: {arch}\nSection: net\nPriority: optional\nMaintainer: Win RDP project <build@localhost>\nInstalled-Size: {size}\nDepends: {deps}, fonts-dejavu-core\nDescription: Win RDP desktop client for Linux\n Rust-powered IronRDP sessions and a native GTK desktop surface.\n This package installs a client only; it does not enable an RDP host service.\n')
         write(stage/'DEBIAN/postinst','#!/bin/sh\nset -e\nif command -v update-desktop-database >/dev/null; then update-desktop-database -q /usr/share/applications || true; fi\nif command -v gtk-update-icon-cache >/dev/null; then gtk-update-icon-cache -q -t /usr/share/icons/hicolor || true; fi\n',0o755)
         manifest=[]
         for p in sorted(stage.rglob('*')):

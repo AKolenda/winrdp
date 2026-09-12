@@ -6233,7 +6233,7 @@ dependencies = [
 
 [[package]]
 name = "winrdp-session"
-version = "0.7.4"
+version = "0.7.5"
 dependencies = [
  "ab_glyph",
  "anyhow",

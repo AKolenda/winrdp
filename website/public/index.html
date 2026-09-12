@@ -26,10 +26,22 @@
         <div class="hero-copy">
           <h1>Built for speed.<br>Designed for Linux.</h1>
           <p class="lead">Bring your Windows desktop to Linux with a Rust-powered IronRDP engine, experimental reliable UDP v1, v2, and v3 support, and a native window for every connection.</p>
-          <a class="button primary" href="https://github.com/AKolenda/winrdp/releases"><svg aria-hidden="true" viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5"/></svg>View GitHub releases</a>
-          <p class="release-note">For Linux x86_64. Early development.<br>Packages, checksums, and release notes live on GitHub.</p>
+          <div class="hero-actions"><a class="button primary" href="https://github.com/AKolenda/winrdp/releases/tag/v0.7.5"><svg aria-hidden="true" viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5"/></svg>Download v0.7.5</a><a class="text-link" href="https://github.com/AKolenda/winrdp">View source <span aria-hidden="true">↗</span></a></div>
+          <p class="release-note">Linux x86_64 · GNU AGPL v3.0<br>Package, checksum, and release notes on GitHub.</p>
         </div>
-        <figure class="launcher"><img src="/assets/launcher.png" alt="Win RDP’s simple launcher, with an IP address field and a list of saved computers" width="480" height="600"><figcaption>The simple launcher. Pick a computer and connect.</figcaption></figure>
+        <figure class="product-demo" aria-labelledby="demo-caption">
+          <div class="demo-board">
+            <div class="demo-topline"><span><i></i> Guided tour</span><span>9 seconds</span></div>
+            <div class="launcher-frame"><img src="/assets/launcher.png" alt="Win RDP launcher with an address field, saved computers, options, and Connect button" width="480" height="600"></div>
+            <span class="click-target target-address" aria-hidden="true"></span>
+            <span class="click-target target-library" aria-hidden="true"></span>
+            <span class="click-target target-connect" aria-hidden="true"></span>
+            <span class="demo-cursor cursor-address" aria-hidden="true"><svg viewBox="0 0 28 34"><path d="M3 2 25 18l-10 2 6 9-5 3-6-10-7 7Z"/></svg><b>Type an address</b></span>
+            <span class="demo-cursor cursor-library" aria-hidden="true"><svg viewBox="0 0 28 34"><path d="M3 2 25 18l-10 2 6 9-5 3-6-10-7 7Z"/></svg><b>Pick a computer</b></span>
+            <span class="demo-cursor cursor-connect" aria-hidden="true"><svg viewBox="0 0 28 34"><path d="M3 2 25 18l-10 2 6 9-5 3-6-10-7 7Z"/></svg><b>Connect</b></span>
+          </div>
+          <figcaption id="demo-caption"><span>Address</span><i></i><span>Computer</span><i></i><span>Connect</span></figcaption>
+        </figure>
       </div>
     </section>
     <section class="client wrap" id="client">

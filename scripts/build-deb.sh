@@ -41,4 +41,4 @@ cargo build --manifest-path "$ROOT/session/Cargo.toml" --release --locked --jobs
 SESSION="$CARGO_TARGET_DIR/release/winrdp-session"
 python3 "$ROOT/scripts/package-binary.py" --binary "$BINARY" --session "$SESSION" --runtime "$RUNTIME" --out "$ROOT/dist"
 echo "Binary package created in $ROOT/dist. Build success is not a live RDP test."
-echo "Install with: sudo apt install $ROOT/dist/winrdp-next_0.7.4_$(dpkg --print-architecture).deb"
+echo "Install with: sudo apt install $ROOT/dist/winrdp-next_0.7.5_$(dpkg --print-architecture).deb"
