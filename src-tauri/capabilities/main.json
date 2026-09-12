@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "main-window",
+  "description": "Only local application assets; no shell, filesystem or network plugins.",
+  "windows": ["main"],
+  "permissions": ["core:default"]
+}

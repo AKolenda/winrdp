@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Win RDP Next
+GenericName=Remote Desktop
+Comment=Experimental Tauri migration of Win RDP
+Exec=winrdp-next
+Icon=winrdp-next
+Terminal=false
+Categories=Network;RemoteAccess;
+Keywords=RDP;Remote Desktop;Windows;FreeRDP;Win RDP;
+StartupNotify=true
+StartupWMClass=winrdp-next

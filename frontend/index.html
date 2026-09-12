@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Win RDP</title><link rel="stylesheet" href="app.css"><script src="app.js" defer></script></head>
+<body class="layout-simple">
+
+<!-- Simple layout: one small window, the way mstsc is. -->
+<section id="simple" class="simple">
+  <header class="caption caption-simple">
+    <img src="assets/winrdp.svg" alt="" class="app-mark"><span class="caption-title">Win RDP</span>
+    <div class="drag-area" data-drag aria-hidden="true"></div>
+    <div class="captions"><button id="simple-settings" class="caption-button" aria-label="Settings" title="Settings"><svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="2.2"/><path d="M8 1.8v1.6M8 12.6v1.6M1.8 8h1.6M12.6 8h1.6M3.6 3.6l1.1 1.1M11.3 11.3l1.1 1.1M3.6 12.4l1.1-1.1M11.3 4.7l1.1-1.1"/></svg></button><button data-window="minimize" class="caption-button" aria-label="Minimize"><svg viewBox="0 0 16 16"><path d="M3 8h10"/></svg></button><button id="close-app" class="caption-button close-caption" aria-label="Close Win RDP"><svg viewBox="0 0 16 16"><path d="m4 4 8 8m0-8-8 8"/></svg></button></div>
+  </header>
+  <div class="simple-body">
+    <label class="field-label" for="computer-box">Computer</label>
+    <div class="combo">
+      <input id="computer-box" autocomplete="off" spellcheck="false" placeholder="10.0.0.7" aria-describedby="signin-line" aria-autocomplete="list" aria-controls="combo-list" aria-expanded="false" role="combobox">
+      <button id="combo-toggle" class="combo-toggle" aria-label="Show saved computers" tabindex="-1"><svg viewBox="0 0 16 16"><path d="m4 6 4 4 4-4"/></svg></button>
+      <ul id="combo-list" class="combo-list" role="listbox" hidden></ul>
+    </div>
+    <div class="signin-line" id="signin-line"><span id="signin-text">Pick a computer, or type an address.</span><button class="link" id="signin-change" hidden>Change</button></div>
+
+    <h2 class="list-heading">Recent</h2>
+    <ul id="recent-list" class="recent" aria-label="Recent computers"></ul>
+    <p id="recent-empty" class="recent-empty" hidden>No saved computers yet. Type an address above and press Enter.</p>
+
+    <div class="simple-foot">
+      <button class="disclosure" id="options-toggle" aria-expanded="false" aria-controls="options-panel"><svg viewBox="0 0 16 16"><path d="m6 4 4 4-4 4"/></svg>Show options</button>
+      <span class="spacer"></span>
+      <button class="primary" id="simple-connect" disabled>Connect</button>
+    </div>
+    <div id="options-panel" class="options-panel" hidden>
+      <label class="check-row"><input id="opt-fullscreen" type="checkbox">Open full screen</label>
+      <label class="check-row"><input id="opt-clipboard" type="checkbox" checked>Share the clipboard</label>
+      <label class="check-row"><input id="opt-audio" type="checkbox" checked>Play remote audio here</label>
+      <label class="check-row"><input id="opt-microphone" type="checkbox">Send my microphone to the remote computer</label>
+      <label class="check-row"><input id="opt-printer" type="checkbox">Offer my printer to the remote computer</label>
+      <div class="options-actions"><button class="quiet" id="simple-new">New computer…</button><button class="quiet" id="simple-edit" disabled>Edit…</button></div>
+    </div>
+    <p class="hint">Enter connects. A green dot means that desktop is already open in its own window.</p>
+  </div>
+</section>
+
+<!-- Full layout: tabs, sidebar, and the list. -->
+<section id="full" class="full" hidden>
+  <header class="caption">
+    <div class="tabs" id="tabs" aria-label="Open desktops"></div>
+    <div class="drag-area" data-drag aria-hidden="true"></div>
+    <div class="captions"><button data-window="minimize" class="caption-button" aria-label="Minimize"><svg viewBox="0 0 16 16"><path d="M3 8h10"/></svg></button><button data-window="maximize" class="caption-button" aria-label="Maximize or restore"><svg viewBox="0 0 16 16"><rect x="3.5" y="3.5" width="9" height="9"/></svg></button><button class="caption-button close-caption" data-close-app aria-label="Close Win RDP"><svg viewBox="0 0 16 16"><path d="m4 4 8 8m0-8-8 8"/></svg></button></div>
+  </header>
+  <section class="session-toolbar" id="session-toolbar" aria-label="Remote session controls" hidden>
+    <div class="session-name"><strong id="session-name"></strong><span id="session-state"></span></div>
+    <button class="quiet" id="send-cad">Ctrl+Alt+Delete</button>
+    <button class="quiet" id="session-clipboard" aria-pressed="true">Clipboard on</button>
+    <button id="session-fullscreen">Full screen</button><button id="disconnect" class="quiet danger-text">Disconnect</button>
+  </section>
+  <div class="workspace" id="workspace">
+    <aside class="sidebar">
+      <div class="brand"><img src="assets/winrdp.svg" alt=""><strong>Win RDP</strong></div>
+      <nav aria-label="Main navigation">
+        <button class="nav-item active" data-page="computers">Computers<span class="count" id="count-all"></span></button>
+        <button class="nav-item" data-page="favorites">Favourites<span class="count" id="count-fav"></span></button>
+        <button class="nav-item" data-page="open">Open now<span class="count" id="count-open"></span></button>
+      </nav>
+      <div class="sidebar-bottom"><button class="nav-item" id="full-settings">Settings</button><span class="build-label" id="build-label"></span></div>
+    </aside>
+    <main>
+      <section id="library-page">
+        <div class="page-heading"><h1 id="page-title">Computers</h1>
+          <label class="search-field"><svg viewBox="0 0 20 20"><circle cx="8.5" cy="8.5" r="5.5"/><path d="m13 13 4 4"/></svg><input id="filter" type="search" aria-label="Find a computer, or type an address and press Enter" placeholder="Find, or type an address and press Enter"></label>
+          <button class="primary" id="new-computer">New computer</button></div>
+        <div id="open-section" hidden><h2 class="section-label">Open now</h2><div class="list" id="open-rows"></div></div>
+        <div id="saved-section"><h2 class="section-label" id="saved-label">Saved</h2><div class="list" id="saved-rows"></div></div>
+        <div id="empty-state" class="empty-state" hidden><svg viewBox="0 0 48 48"><rect x="7" y="9" width="34" height="24" rx="3"/><path d="M24 33v6m-9 0h18m-9-24v12m-6-6h12"/></svg><h2>Add your first computer</h2><p>Save its address and username, or type an address in the search field and press Enter.</p><button id="empty-new">New computer</button></div>
+      </section>
+      <section id="connecting-page" hidden><div class="connecting"><img src="assets/winrdp.svg" alt=""><h1 id="connecting-name">Connecting</h1><p id="connecting-stage">Starting the session</p><button id="cancel-connect">Cancel connection</button></div></section>
+    </main>
+  </div>
+</section>
+
+<div id="message" role="status" hidden><span></span><button aria-label="Dismiss message">Dismiss</button></div>
+
+<dialog id="computer-dialog" class="win"><form id="computer-form"><div class="dialog-heading"><h2 id="computer-dialog-title">New computer</h2><button type="button" class="icon-close" data-close="computer-dialog" aria-label="Close">×</button></div><div class="dialog-body">
+  <label>Name (optional)<input name="name" maxlength="100" placeholder="Office PC"></label>
+  <label>Address<input name="address" required maxlength="512" spellcheck="false" placeholder="192.168.1.24"></label>
+  <label>Username<input name="username" maxlength="256" autocomplete="username" placeholder="Alex or WORK\Alex"></label>
+  <label class="check-row"><input name="fullscreen" type="checkbox">Open full screen</label>
+  <label class="check-row"><input name="clipboard" type="checkbox" checked>Share the clipboard</label>
+  <label class="check-row"><input name="audio" type="checkbox" checked>Play remote audio here</label>
+  <label class="check-row"><input name="microphone" type="checkbox">Send my microphone to the remote computer</label>
+  <label class="check-row"><input name="printer" type="checkbox">Offer my printer to the remote computer</label>
+  <label class="check-row"><input name="favorite" type="checkbox">Favourite</label>
+  <p id="profile-error" class="form-error" role="alert" hidden></p></div>
+  <div class="dialog-footer"><button type="button" class="danger-text" id="remove-computer" hidden>Remove</button><span class="spacer"></span><button type="button" data-close="computer-dialog">Cancel</button><button class="primary" type="submit">Save</button></div></form></dialog>
+
+<dialog id="password-dialog" class="win"><form id="password-form"><div class="dialog-heading"><h2 id="password-title">Connect</h2><button class="icon-close" type="button" data-close="password-dialog" aria-label="Close">×</button></div><div class="dialog-body"><p id="password-account"></p><label>Password<input id="password-input" type="password" required autocomplete="off" maxlength="4096"></label><label class="check-row"><input id="open-fullscreen" type="checkbox">Open full screen</label><label class="check-row" id="open-in-tab-row"><input id="open-in-tab" type="checkbox">Open in a tab inside Win RDP (classic engine, no RDP-UDP)</label><p class="hint">Use the Windows account password, not its PIN. Passwords are not saved.</p></div><div class="dialog-footer"><span class="spacer"></span><button type="button" data-close="password-dialog">Cancel</button><button class="primary" type="submit">Connect</button></div></form></dialog>
+
+<dialog id="certificate-dialog" class="win"><div class="dialog-heading"><h2>Check this computer’s identity</h2></div><div class="dialog-body"><p>Compare this fingerprint with the remote computer before continuing.</p><pre id="certificate-details"></pre><p class="hint">Reject a changed or unexpected identity until you have verified it.</p></div><div class="dialog-footer"><span class="spacer"></span><button id="cert-reject">Reject</button><button id="cert-once">Connect once</button><button class="primary" id="cert-remember">Trust and connect</button></div></dialog>
+
+<dialog id="confirm-dialog" class="win confirm"><div class="dialog-body"><h2 id="confirm-title"></h2><p id="confirm-text"></p></div><div class="dialog-footer"><span class="spacer"></span><button class="primary" id="confirm-yes">Continue</button><button id="confirm-no">Cancel</button></div></dialog>
+
+<dialog id="settings-dialog" class="win settings"><div class="dialog-heading"><h2>Settings</h2><button type="button" class="icon-close" data-close="settings-dialog" aria-label="Close">×</button></div><div class="dialog-body settings-body">
+  <h3>Layout</h3>
+  <div class="settings-panel">
+    <label class="radio-row"><input type="radio" name="layout" value="simple"><span><strong>Simple</strong><small>One small window: pick a computer, connect. Every desktop opens in its own window.</small></span></label>
+    <label class="radio-row"><input type="radio" name="layout" value="full"><span><strong>Full</strong><small>Sidebar, search, and tabs. Adds the option to open a desktop in a tab with the classic engine.</small></span></label>
+  </div>
+  <h3>Appearance</h3>
+  <div class="settings-panel">
+    <div class="setting-row"><span><strong>Dark appearance</strong></span><button class="switch" id="dark-switch" role="switch" aria-checked="false" aria-label="Dark appearance"><span></span></button></div>
+    <div class="setting-row"><span><strong>Open Settings at startup</strong></span><button class="switch" id="startup-switch" role="switch" aria-checked="false" aria-label="Open Settings at startup"><span></span></button></div>
+  </div>
+  <h3>Connecting to Windows</h3>
+  <div class="settings-panel">
+    <p class="settings-text">Desktops open over reliable RDP-UDP when the host allows it, using MS-RDPEUDP version 1 or 2 or MS-RDPEUDP2 (shown as UDP v1, v2 and v3), and fall back to TCP by themselves. Microphone and printer redirection are per computer, under Edit.</p>
+  </div>
+  <h3>Letting Windows connect to this computer</h3>
+  <div class="settings-panel">
+    <div class="setting-row"><span><strong>Accept connections from Windows</strong><small id="host-summary" class="muted"></small></span><button class="switch" id="host-switch" role="switch" aria-checked="false" aria-label="Accept connections from Windows"><span></span></button></div>
+    <p class="settings-text" id="host-text"></p>
+    <div class="host-modes">
+      <label class="radio-row"><input type="radio" name="hostmode" value="mirror"><span><strong>Show my screen</strong><small>Windows sees exactly what is on this monitor. Needs the monitor connected and on.</small></span></label>
+      <label class="radio-row"><input type="radio" name="hostmode" value="extend"><span><strong>Virtual screen</strong><small>Same sign-in, on a screen of its own. Works with the monitor off or unplugged.</small></span></label>
+    </div>
+    <form id="host-form" class="host-form" hidden><label>Sharing name<input id="host-user" maxlength="64" autocomplete="off" spellcheck="false"></label><label>Sharing password<input id="host-pass" type="password" maxlength="512" autocomplete="off"></label><button class="primary" type="submit">Turn on</button></form>
+    <div class="settings-actions"><button class="quiet" id="host-open">Open GNOME's Remote Desktop settings</button><button class="quiet" id="host-refresh">Refresh</button></div>
+    <p class="settings-text muted">Sharing mirrors the desktop you are signed in to, so Windows sees your screen, not a separate login. It runs at every sign-in whether or not Win RDP is open, over TCP; hosting over RDP-UDP is not built yet.</p>
+  </div>
+  <p class="settings-text muted" id="backend-info"></p>
+</div></dialog>
+</body></html>

@@ -1,0 +1,20 @@
+test_build_script_syntax (__main__.RecoveryTests.test_build_script_syntax) ... ok
+test_capabilities (__main__.RecoveryTests.test_capabilities) ... ok
+test_env_is_private_first (__main__.RecoveryTests.test_env_is_private_first) ... ok
+test_js_syntax (__main__.RecoveryTests.test_js_syntax) ... ok
+test_manifest (__main__.RecoveryTests.test_manifest) ... ok
+test_metadata_xml (__main__.RecoveryTests.test_metadata_xml) ... ok
+test_missing_binary (__main__.RecoveryTests.test_missing_binary) ... ok
+test_native_no_widgets_frontend (__main__.RecoveryTests.test_native_no_widgets_frontend) ... ok
+test_no_fake_binary_package (__main__.RecoveryTests.test_no_fake_binary_package) ... ok
+test_no_web_frame_transport (__main__.RecoveryTests.test_no_web_frame_transport) ... ok
+test_original_clipboard_fix_retained (__main__.RecoveryTests.test_original_clipboard_fix_retained) ... ok
+test_password_not_profile (__main__.RecoveryTests.test_password_not_profile) ... ok
+test_private_path_boundary (__main__.RecoveryTests.test_private_path_boundary) ... ok
+test_separate_identity (__main__.RecoveryTests.test_separate_identity) ... ok
+test_source_files (__main__.RecoveryTests.test_source_files) ... ok
+
+----------------------------------------------------------------------
+Ran 15 tests in 0.026s
+
+OK

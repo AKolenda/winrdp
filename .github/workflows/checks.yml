@@ -1,0 +1,22 @@
+name: Source checks
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  source:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Check source and packaging metadata
+        run: |
+          python3 tests/recovery_tests.py
+          python3 tests/command_error_checks.py
+          node --check frontend/app.js
+          python3 scripts/check-release.py
+          python3 -m py_compile scripts/*.py

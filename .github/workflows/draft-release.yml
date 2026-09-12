@@ -1,0 +1,32 @@
+name: Prepare draft release
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag matching the application version (for example v0.7.4)
+        required: true
+        type: string
+permissions:
+  contents: write
+jobs:
+  draft:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.tag }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Validate release source
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          python3 tests/recovery_tests.py
+          python3 scripts/check-release.py --tag "$RELEASE_TAG"
+          git show-ref --verify "refs/tags/$RELEASE_TAG"
+      - name: Create reviewable draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          gh release create "$RELEASE_TAG" --verify-tag --draft --title "Win RDP $RELEASE_TAG" --notes-file docs/RELEASE-NOTES.md
