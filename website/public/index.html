@@ -18,7 +18,7 @@
   <a class="skip" href="#main">Skip to content</a>
   <header class="header wrap">
     <a class="brand" href="/" aria-label="Win RDP home"><img src="/assets/winrdp.svg" width="36" height="36" alt="">Win RDP</a>
-    <nav aria-label="Main navigation"><a href="#client">The client</a><a href="https://github.com/AKolenda/winrdp/blob/master/BUILDING.md">Documentation</a><a href="https://github.com/AKolenda/winrdp">GitHub <span aria-hidden="true">↗</span></a></nav>
+    <nav aria-label="Main navigation"><a href="#windows">Screenshots</a><a href="#client">The client</a><a href="https://github.com/AKolenda/winrdp/blob/master/BUILDING.md">Documentation</a><a href="https://github.com/AKolenda/winrdp">GitHub <span aria-hidden="true">↗</span></a></nav>
   </header>
   <main id="main">
     <section class="hero">
@@ -31,7 +31,8 @@
         </div>
         <figure class="product-demo" aria-labelledby="demo-caption">
           <div class="demo-board">
-            <div class="demo-topline"><span><i></i> Guided tour</span><span>9 seconds</span></div>
+            <div class="demo-topline"><span>Guided tour</span><span>9 seconds</span></div>
+            <div class="launcher-stage">
             <div class="launcher-frame"><img src="/assets/launcher.png" alt="Win RDP launcher with an address field, saved computers, options, and Connect button" width="480" height="600"></div>
             <span class="click-target target-address" aria-hidden="true"></span>
             <span class="click-target target-library" aria-hidden="true"></span>
@@ -39,10 +40,16 @@
             <span class="demo-cursor cursor-address" aria-hidden="true"><svg viewBox="0 0 28 34"><path d="M3 2 25 18l-10 2 6 9-5 3-6-10-7 7Z"/></svg><b>Type an address</b></span>
             <span class="demo-cursor cursor-library" aria-hidden="true"><svg viewBox="0 0 28 34"><path d="M3 2 25 18l-10 2 6 9-5 3-6-10-7 7Z"/></svg><b>Pick a computer</b></span>
             <span class="demo-cursor cursor-connect" aria-hidden="true"><svg viewBox="0 0 28 34"><path d="M3 2 25 18l-10 2 6 9-5 3-6-10-7 7Z"/></svg><b>Connect</b></span>
+            </div>
           </div>
           <figcaption id="demo-caption"><span>Address</span><i></i><span>Computer</span><i></i><span>Connect</span></figcaption>
         </figure>
       </div>
+    </section>
+    <section class="windows wrap" id="windows">
+      <div class="section-intro"><h2>Every desktop.<br>In its own window.</h2><p>Connect, and the Windows desktop opens in a native window with the computer name and transport in its title. Resize it, switch to full screen, or keep several open side by side.</p></div>
+      <figure class="shot"><img src="/assets/session.png" alt="A Win RDP session window titled Office PC - Win RDP (UDP v2), showing a Windows 11 desktop with Settings open" width="1280" height="835" loading="lazy"><figcaption>A session window over reliable UDP. The title shows the computer name and the transport in use.</figcaption></figure>
+      <figure class="shot"><img src="/assets/launcher-full.png" alt="The full launcher layout with a sidebar, search box, and a list of saved computers with Connect buttons" width="1240" height="820" loading="lazy"><figcaption>The full layout: sidebar, search, and every saved computer with when it was last opened.</figcaption></figure>
     </section>
     <section class="client wrap" id="client">
       <div class="section-intro"><h2>A small client.<br>A proper remote desktop.</h2><p>Connect directly over your LAN or VPN. Your session goes to your Windows computer, with no Win RDP account or relay in between.</p></div>

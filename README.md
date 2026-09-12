@@ -66,9 +66,13 @@ computer or type an address, press Enter. Every desktop opens in its own window.
 **Full** adds a sidebar, search, and tabs, and can open a desktop in a tab inside the
 launcher using the classic FreeRDP engine.
 
+![The full launcher layout with a sidebar, search, and saved computers](docs/screenshots/launcher-full.png)
+
 
 
 ### Session window
+
+![A session window titled Office PC - Win RDP (UDP v2) showing a Windows 11 desktop](docs/screenshots/session-window.png)
 
 - Windows 11 style connection bar in full screen: pin, restore, close, transport label.
 - Resizing the window resizes the remote desktop through Display Control.
