@@ -1,8 +1,11 @@
 # Win RDP
 
-A Remote Desktop client for Linux that talks to Windows the way Windows talks to itself:
-over reliable RDP-UDP as well as TCP, with the graphics pipeline, clipboard, audio,
-microphone, and printer redirection.
+**Built for speed. Designed for Linux.**
+
+Connect to Windows with a Rust-powered remote desktop client built on IronRDP.
+Win RDP brings experimental reliable UDP v1, v2, and v3 transport support,
+automatic TCP fallback, and Windows’ graphics pipeline to a native session window,
+with clipboard, audio, microphone, and printer redirection.
 
 [Website](https://winrdp.app) · [Releases](https://github.com/AKolenda/winrdp/releases)
 
@@ -10,7 +13,8 @@ Early development: check the release notes for tested platforms and known limita
 
 ## What is different about it
 
-Win RDP includes experimental reliable UDP transport support alongside TCP:
+UDP v1, v2, and v3, powered by Rust. Win RDP’s IronRDP fork implements
+experimental reliable UDP transport support alongside TCP:
 
 | Label in the app | Protocol | Spec |
 |---|---|---|
@@ -19,10 +23,11 @@ Win RDP includes experimental reliable UDP transport support alongside TCP:
 | UDP v3 | RDP-UDP2 | [MS-RDPEUDP2] |
 | TCP | plain RDP | [MS-RDPBCGR] |
 
-The session offers version 2 first, since every Windows host measured answers it at once,
-and falls back to TCP by itself when UDP is blocked. Graphics ([MS-RDPEGFX]) are moved
-onto the UDP tunnel with a Soft-Sync, so frames ride the reliable-UDP path with its own
-retransmit and ACK-vector machinery instead of TCP's head-of-line blocking.
+The launcher offers version 2 first, the version used in the recorded live Windows
+tests, and falls back to TCP automatically when UDP cannot be established.
+Version 3 uses RDP-UDP2; its implementation still needs live-host validation.
+Graphics ([MS-RDPEGFX]) are moved onto the UDP tunnel with a Soft-Sync, so frames
+ride the reliable-UDP path with its own retransmit and ACK-vector machinery.
 
 The RDP engine is [IronRDP](https://github.com/Devolutions/IronRDP), a Rust
 implementation, through a fork that adds the RDP-UDP transport. The transport work is
@@ -42,8 +47,9 @@ A local Windows test host, 1280x720, Task Manager open, 60 s per run, 2026-09-07
 | tunnel retransmits / reorders | 1 / 0 | n/a |
 
 On a clean LAN the two are at parity: frame rate is bounded by how often the remote
-screen changes, not by the transport. UDP is built for lossy and high-latency links, where
-TCP stalls on every lost packet. To compare on your own network, run the session binary
+screen changes, not by the transport. The UDP transport targets lossy and
+high-latency links; a performance advantage on those networks has not yet been
+established by these measurements. To compare on your own network, run the session binary
 with `IRONRDP_UDP=1` and with `IRONRDP_UDP=0`, then grep `session perf` in the logs.
 
 ## The launcher
