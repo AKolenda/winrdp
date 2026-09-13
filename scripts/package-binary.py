@@ -9,7 +9,7 @@ from __future__ import annotations
 import argparse, hashlib, json, os, re, shutil, subprocess, sys, tempfile
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
-VERSION='0.7.5'
+VERSION='0.7.6'
 
 def command(args, *, cwd=None, env=None):
     result=subprocess.run([str(a) for a in args],cwd=cwd,env=env,text=True,

@@ -138,13 +138,16 @@ fn session_status(window: WebviewWindow, app: tauri::AppHandle) -> Result<Value,
     let mut map = sessions.children.lock().map_err(|_| "Session lock failed")?;
     map.retain(|id, child| match child.try_wait() {
         Ok(Some(status)) => {
+            // Why the session stopped, as it published before exiting:
+            // {"state":"failed","reason":"credentials","message":"...","detail":"..."}.
+            let published = read_status(&log_dir, id);
             let _ = fs::remove_file(status_file(&log_dir, id));
-            ended.push(json!({"session": id, "code": status.code()})); false
+            ended.push(json!({"session": id, "code": status.code(), "status": published})); false
         }
         _ => {
             // Transport as published by the session: {"transport":"udp","udpVersion":2,"label":"UDP v2"}.
-            let transport = fs::read(status_file(&log_dir, id)).ok()
-                .and_then(|bytes| serde_json::from_slice::<Value>(&bytes).ok());
+            // A record without a label is a failure notice, not a transport.
+            let transport = read_status(&log_dir, id).filter(|value| value.get("label").is_some());
             live.push(json!({"session": id, "transport": transport}));
             true
         }
@@ -152,6 +155,10 @@ fn session_status(window: WebviewWindow, app: tauri::AppHandle) -> Result<Value,
     Ok(json!({"ended": ended, "live": live}))
 }
 fn status_file(log_dir: &std::path::Path, session_id: &str) -> PathBuf { log_dir.join(format!("session-{session_id}.status.json")) }
+fn read_status(log_dir: &std::path::Path, session_id: &str) -> Option<Value> {
+    fs::read(status_file(log_dir, session_id)).ok()
+        .and_then(|bytes| serde_json::from_slice::<Value>(&bytes).ok())
+}
 #[tauri::command]
 fn kill_session(window: WebviewWindow, app: tauri::AppHandle, id: String) -> Result<Value, String> {
     trusted(&window)?;
@@ -166,7 +173,16 @@ fn graphics() -> String { "auto".into() }
 fn layout() -> u32 { 0x409 }
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct Preferences { dark: bool, open_settings: bool, #[serde(default = "layout_simple")] layout: String, #[serde(default)] host_checked: bool }
+struct Preferences {
+    dark: bool,
+    /// Retired in 0.7.6: the app used to open Settings at startup. Accepted so
+    /// libraries written by earlier versions still load, and dropped on save.
+    #[serde(default, skip_serializing)]
+    #[allow(dead_code)]
+    open_settings: bool,
+    #[serde(default = "layout_simple")] layout: String,
+    #[serde(default)] host_checked: bool,
+}
 fn layout_simple() -> String { "simple".into() }
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -212,7 +228,7 @@ async fn bootstrap(window: WebviewWindow, app: tauri::AppHandle) -> Result<Value
     trusted(&window)?;
     let library = { let store = app.state::<Store>(); let _guard = store.lock.lock().map_err(|_| "Library lock failed")?; store.load()? };
     let info = native(&window, "info", json!({}), None).await?;
-    Ok(json!({"library": library, "native": info, "version": "0.7.5", "engine": engine(),
+    Ok(json!({"library": library, "native": info, "version": "0.7.6", "engine": engine(),
         "user": std::env::var("USER").unwrap_or_default()}))
 }
 #[tauri::command]
@@ -384,7 +400,7 @@ async fn quit(window: WebviewWindow, app: tauri::AppHandle) -> Result<(), String
     Err("A connection is still shutting down. Wait a moment, then close again.".into())
 }
 fn main() {
-    if std::env::args().any(|a| a == "--version") { println!("Win RDP 0.7.5"); return; }
+    if std::env::args().any(|a| a == "--version") { println!("Win RDP 0.7.6"); return; }
     // This recovery build establishes a software baseline, not an experimental GPU release.
     std::env::set_var("WINRDP_HWDECODER", "software");
     tauri::Builder::default()

@@ -47,6 +47,17 @@ class RecoveryTests(unittest.TestCase):
         rust=(ROOT/'src-tauri/src/main.rs').read_text();profile=rust.split('struct Profile {',1)[1].split('\n}',1)[0]
         self.assertNotIn('password',profile);self.assertIn('Zeroizing::new(password)',rust)
         self.assertIn('deny_unknown_fields',rust)
+    def test_settings_do_not_open_themselves(self):
+        js=(ROOT/'frontend/app.js').read_text();html=(ROOT/'frontend/index.html').read_text()
+        self.assertNotIn('preferences.openSettings',js);self.assertNotIn('startup-switch',html);self.assertNotIn('startup-switch',js)
+        self.assertIn("get('open')==='settings'",js)
+    def test_refused_connections_are_reported(self):
+        js=(ROOT/'frontend/app.js').read_text();launcher=(ROOT/'src-tauri/src/main.rs').read_text()
+        session=(ROOT/'session/src/app.rs').read_text()
+        self.assertIn('reportSessionEnd',js);self.assertIn("failure.reason==='credentials'",js)
+        self.assertIn('id="password-error"',(ROOT/'frontend/index.html').read_text())
+        self.assertIn('"status": published',launcher)
+        self.assertIn('write_failure_status(&failure)',session);self.assertIn('WRONG_CREDENTIALS',session)
     def test_capabilities(self):
         capabilities=json.loads((ROOT/'src-tauri/capabilities/main.json').read_text())
         self.assertEqual(capabilities['windows'],['main']);self.assertNotIn('remote',capabilities)

@@ -1,6 +1,6 @@
 [package]
 name = "winrdp-session"
-version = "0.7.5"
+version = "0.7.6"
 edition = "2024"
 description = "Win RDP session window: one IronRDP-powered process per remote desktop"
 license = "AGPL-3.0-only"
@@ -9,7 +9,6 @@ default-run = "winrdp-session"
 
 [lib]
 doctest = false
-test = false
 
 [[bin]]
 name = "winrdp-session"

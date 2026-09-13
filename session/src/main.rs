@@ -89,6 +89,13 @@ fn main() -> anyhow::Result<()> {
     debug!("Run App");
     event_loop.run_app(&mut app)?;
 
+    // A refused or dropped session exits non-zero; the launcher reads the reason
+    // from the status file the window wrote before it closed.
+    let exit_code = app.exit_code();
+    if exit_code != 0 {
+        proc_exit::Code::from(exit_code).process_exit();
+    }
+
     Ok(())
 }
 
