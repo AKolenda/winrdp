@@ -53,7 +53,7 @@ needed by the standalone session. Keep both committed Cargo lockfiles.
 ```sh
 bash scripts/build-deb.sh --check
 bash scripts/build-deb.sh
-sudo apt install ./dist/winrdp-next_0.7.5_amd64.deb
+sudo apt install ./dist/winrdp-next_0.7.6_amd64.deb
 winrdp-next
 ```
 

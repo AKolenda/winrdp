@@ -2,7 +2,7 @@
 'use strict';
 const $ = id => document.getElementById(id);
 const nativeMode = Boolean(window.__TAURI__?.core?.invoke);
-let library = {version:1, computers:[], preferences:{dark:false,openSettings:false,layout:'simple'}};
+let library = {version:1, computers:[], preferences:{dark:false,layout:'simple'}};
 let engine='freerdp', version='', localUser='';
 let layout='simple', page='computers';
 let editing='', connectAfterSave=false, passwordProfile='', chosen='';     // chosen: profile id picked in the simple window
@@ -46,7 +46,6 @@ async function action(operation,payload={}) { return invoke('session_action',{op
 function applyTheme() {
   document.documentElement.classList.toggle('dark',!!library.preferences.dark);
   $('dark-switch').setAttribute('aria-checked',String(!!library.preferences.dark));
-  $('startup-switch').setAttribute('aria-checked',String(!!library.preferences.openSettings));
   document.querySelectorAll('input[name=layout]').forEach(r=>{r.checked=r.value===layout;});
 }
 async function applyLayout(next, resize=true) {
@@ -277,11 +276,14 @@ $('remove-computer').onclick=()=>{
 };
 
 // ---------- connecting ----------
-function promptPassword(id) {
+// `refused` is the sentence the computer gave for the previous attempt, shown
+// above the box so a retyped password lands in a dialog that says what went wrong.
+function promptPassword(id, refused='') {
   const p=library.computers.find(x=>x.id===id); if(!p) return;
   if(!nativeMode){message('Browser preview only. No remote connections are made.');return;}
   if(!p.username){editComputer(id,true);return;}
   passwordProfile=id; $('password-title').textContent=`Connect to ${p.name}`; $('password-account').textContent=`${p.username} at ${p.address}`;
+  $('password-error').textContent=refused; $('password-error').hidden=!refused;
   $('open-fullscreen').checked=!!p.fullscreen;
   $('open-in-tab-row').hidden=layout!=='full'||engine!=='ironrdp'; $('open-in-tab').checked=!!p.compatibility&&layout==='full';
   $('password-input').value=''; $('password-dialog').showModal(); $('password-input').focus();
@@ -303,7 +305,23 @@ $('password-form').onsubmit=run(async e=>{
   await openSession(result.session);
 });
 document.querySelectorAll('[data-close]').forEach(e=>e.onclick=()=>{$(e.dataset.close).close();$('password-input').value='';});
-$('password-dialog').addEventListener('close',()=>$('password-input').value='');
+$('password-dialog').addEventListener('close',()=>{$('password-input').value='';$('password-error').hidden=true;});
+
+// A desktop window that closed by itself. The session publishes why it stopped;
+// without this a mistyped password just closed the window and said nothing.
+function reportSessionEnd(session, ended) {
+  const failure=ended.status&&ended.status.state==='failed'?ended.status:null;
+  const name=session?.name||'The desktop';
+  if(!failure){
+    // No word from the session at all: it stopped before it could report.
+    if(session&&!ended.status&&session.state!=='Connected') message(`${name} closed before the desktop opened. See the session log.`);
+    return;
+  }
+  const retry=failure.reason==='credentials';
+  const detail=!retry&&failure.reason!=='account'&&failure.detail?`\n${failure.detail}`:'';
+  message(`${name}: ${failure.message}${detail}`);
+  if(retry&&session?.profileId) promptPassword(session.profileId,failure.message);
+}
 
 // ---------- settings ----------
 async function openSettings() {
@@ -340,7 +358,7 @@ $('host-form').onsubmit=run(async e=>{ e.preventDefault(); await enableHost($('h
 document.querySelectorAll('input[name=hostmode]').forEach(r=>r.onchange=run(async()=>{ if(r.checked&&host?.sharing&&host.credentials) await enableHost('',''); }));
 $('host-refresh').onclick=run(refreshHost); $('host-open').onclick=run(()=>invoke('open_host_settings'));
 document.querySelectorAll('input[name=layout]').forEach(r=>r.onchange=run(async()=>{ if(!r.checked) return; await savePreferences({layout:r.value}); await applyLayout(r.value); }));
-for(const [id,key] of [['dark-switch','dark'],['startup-switch','openSettings']]) $(id).onclick=run(()=>savePreferences({[key]:!library.preferences[key]}));
+$('dark-switch').onclick=run(()=>savePreferences({dark:!library.preferences.dark}));
 
 // ---------- window, confirm, quit ----------
 document.querySelectorAll('[data-window]').forEach(e=>e.onclick=run(()=>invoke('window_action',{operation:e.dataset.window})));
@@ -389,7 +407,7 @@ async function poll() {
     }
     let changed=false;
     if(engine==='ironrdp'){const st=await invoke('session_status');
-      for(const x of st.ended){if(sessions.delete(x.session)){closedSessions.add(x.session);changed=true;}}
+      for(const x of st.ended){const s=sessions.get(x.session);if(!sessions.delete(x.session))continue;closedSessions.add(x.session);changed=true;reportSessionEnd(s,x);}
       for(const x of st.live||[]){const s=sessions.get(x.session);if(!s)continue;
         const label=x.transport?.label||null;if((s.transport?.label||null)!==label){s.transport=x.transport;s.state=label?'Connected':s.state;changed=true;}}}
     if(changed) renderAll();
@@ -414,7 +432,7 @@ run(async()=>{
   $('build-label').textContent=version?`Win RDP ${version}`:''; $('backend-info').textContent=nativeMode?`Win RDP ${version}. Sessions use the IronRDP engine; the classic FreeRDP engine drives in-tab desktops.`:'Browser design preview. No system changes or remote connections.';
   const wanted=new URLSearchParams(location.search).get('layout')||library.preferences.layout||'simple';
   await applyLayout(wanted, nativeMode);
-  if(library.preferences.openSettings||new URLSearchParams(location.search).get('open')==='settings') await openSettings();
+  if(new URLSearchParams(location.search).get('open')==='settings') await openSettings();
 
   if(nativeMode&&!result.native.attached) message('The native surface is not attached. In-tab desktops are unavailable until the app is restarted.');
   poll();

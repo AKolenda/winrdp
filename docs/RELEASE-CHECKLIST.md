@@ -27,7 +27,7 @@
 
 ## GitHub release
 
-- Keep version fields synchronized; `scripts/check-release.py --tag v0.7.5` validates them.
+- Keep version fields synchronized; `scripts/check-release.py --tag v0.7.6` validates them.
 - Create and push the release tag only after the desired source is committed in both repos.
 - Run the manual **Prepare draft release** workflow against that tag. It creates a draft
   and never publishes it automatically.
