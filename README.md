@@ -32,9 +32,11 @@ Graphics ([MS-RDPEGFX]) are moved onto the UDP tunnel with a Soft-Sync, so frame
 ride the reliable-UDP path with its own retransmit and ACK-vector machinery.
 
 The RDP engine is [IronRDP](https://github.com/Devolutions/IronRDP), a Rust
-implementation, through a fork that adds the RDP-UDP transport. The transport work is
-being contributed upstream as
-[Devolutions/IronRDP#1919](https://github.com/Devolutions/IronRDP/pull/1919).
+implementation, through a fork that adds the RDP-UDP transport. The MS-RDPEUDP
+version 1/2 reliable data transfer was upstreamed in
+[Devolutions/IronRDP#1919](https://github.com/Devolutions/IronRDP/pull/1919), merged on
+2026-09-10; the fork still carries the graphics-over-tunnel work, the RDP-UDP2 path and
+the Linux clipboard, printer and audio redirection.
 
 ### Measured on a clean LAN
 
@@ -52,7 +54,11 @@ On a clean LAN the two are at parity: frame rate is bounded by how often the rem
 screen changes, not by the transport. The UDP transport targets lossy and
 high-latency links; a performance advantage on those networks has not yet been
 established by these measurements. To compare on your own network, run the session binary
-with `IRONRDP_UDP=1` and with `IRONRDP_UDP=0`, then grep `session perf` in the logs.
+with `IRONRDP_UDP=1 IRONRDP_UDP_OFFER=2` and with `IRONRDP_UDP=0`, then grep
+`session perf` in the logs. Set the offer explicitly: on its own, the session binary
+offers version 3, which the Windows hosts measured here do not answer at all, so the
+bootstrap times out and both halves of the comparison quietly measure TCP. The launcher
+already passes `WINRDP_UDP_OFFER=2`, so installed sessions are unaffected.
 
 ## The launcher
 
@@ -93,7 +99,7 @@ See [BUILDING.md](BUILDING.md) for prerequisites. Then:
 
 ```sh
 bash scripts/build-deb.sh
-sudo apt install ./dist/winrdp-next_0.7.6_amd64.deb
+sudo apt install ./dist/winrdp-next_0.7.7_amd64.deb
 ```
 
 The package installs `winrdp-next` (the launcher) and `winrdp-session` (one process per
@@ -107,7 +113,8 @@ desktop) and leaves any other RDP client on the machine alone.
 | `src-tauri/` | The launcher shell: Tauri, plus the classic in-window FreeRDP engine bridge. |
 | `session/` | `winrdp-session`, the IronRDP-based session window. |
 | `third_party/ironrdp/` | The IronRDP fork with RDP-UDP, the Linux clipboard backend, and the printer backend. |
-| `design/` | Launcher design concepts, as static HTML. |
+| `engine/` | The classic Qt/FreeRDP engine, used for in-tab sessions. |
+| `native/` | The GTK bridge between the launcher shell and that engine, and its CMake build. |
 | `website/` | Static release website; download links go to GitHub Releases. |
 
 ## Hosting

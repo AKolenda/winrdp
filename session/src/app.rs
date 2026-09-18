@@ -72,6 +72,39 @@ enum DialogOutcome {
     Cancel,
 }
 
+/// Which close signal the RDP thread needs.
+#[derive(Debug, PartialEq, Eq)]
+enum CloseKind {
+    /// Cancel a connection attempt outright. The graceful signal is only read
+    /// once the session is active, so it cannot end a connect that is still in
+    /// flight.
+    Cancel,
+    /// Ask an active session to shut down over RDP.
+    Graceful,
+}
+
+/// A window with no desktop drawn in it yet is still connecting.
+fn close_kind(has_desktop: bool) -> CloseKind {
+    if has_desktop { CloseKind::Graceful } else { CloseKind::Cancel }
+}
+
+/// Where a pointer position in the window lands on the remote desktop.
+///
+/// [`App::draw`] blits the remote frame 1:1 from the top-left and pads the rest
+/// of the window black, so the pointer maps the same way. Scaling the position
+/// by the window size instead puts clicks in the wrong place for as long as the
+/// window and the desktop disagree, which is every pending resize and the whole
+/// session on a host that refuses to resize. `None` means the pointer is over
+/// the padding rather than over the desktop.
+fn remote_pointer(position: (f64, f64), desktop: (u16, u16)) -> Option<(u16, u16)> {
+    let (x, y) = position;
+    if x < 0.0 || y < 0.0 || x >= f64::from(desktop.0) || y >= f64::from(desktop.1) {
+        return None;
+    }
+    #[expect(clippy::as_conversions, reason = "bounded above by the desktop size")]
+    Some((x as u16, y as u16))
+}
+
 /// The desktop-file identity shared with the launcher (`StartupWMClass` in
 /// `io.winrdp.Next.desktop`), so the shell shows the Win RDP icon for the
 /// session window and groups it with the launcher.
@@ -110,7 +143,7 @@ fn app_icon() -> Option<winit::window::Icon> {
     buffer.truncate(info.buffer_size());
     let rgba = match info.color_type {
         png::ColorType::Rgba => buffer,
-        png::ColorType::Rgb => buffer.chunks_exact(3).flat_map(|px| [px[0], px[1], px[2], 0xFF]).collect(),
+        png::ColorType::Rgb => buffer.as_chunks::<3>().0.iter().flat_map(|px| [px[0], px[1], px[2], 0xFF]).collect(),
         _ => return None,
     };
     winit::window::Icon::from_rgba(rgba, info.width, info.height).ok()
@@ -195,6 +228,11 @@ struct Failure {
 
 const WRONG_CREDENTIALS: &str = "The user name or password is incorrect.";
 
+/// The context the engine attaches to a failed TLS handshake. `ConnectorError`
+/// exposes its context only through the rendered report, so this is matched
+/// against that text.
+const TLS_UPGRADE: &str = "TLS upgrade";
+
 /// Windows states exactly why a sign-in was refused in the CredSSP NTSTATUS.
 /// Only a mistyped name or password is worth asking again for; the rest name a
 /// condition on the account that retyping cannot change.
@@ -272,6 +310,12 @@ fn connect_failure(error: &ironrdp::connector::ConnectorError) -> Failure {
             "protocol",
             "The Windows computer sent something this client could not read.".to_owned(),
         ),
+        // The host answered on the RDP port and then failed the secure handshake,
+        // so the "is it switched on?" advice below would send the user the wrong way.
+        _ if detail.contains(TLS_UPGRADE) => (
+            "protocol",
+            "The Windows computer answered, but the secure connection could not be set up.".to_owned(),
+        ),
         _ if is_io_failure(error) => (
             "network",
             "Could not reach the Windows computer. Check that it is switched on, reachable, and has Remote Desktop turned on.".to_owned(),
@@ -298,6 +342,27 @@ fn write_failure_status(failure: &Failure) {
 /// Publishes an ordinary end of session, so the launcher stays quiet about it.
 fn write_closed_status() {
     write_status("{\"state\":\"closed\"}\n");
+}
+
+/// What a session that never got as far as a window exits with. `EX_CONFIG` from
+/// `sysexits`, so a caller can tell it from a refused sign-in.
+pub const STARTUP_FAILURE_EXIT: i32 = 78;
+
+/// Publishes a failure that happened before there was a window to show it in.
+///
+/// Everything the launcher knows about a session comes from the status file and
+/// the log. A configuration error that only reaches stderr is discarded, and the
+/// launcher then tells the user to read a log that was never opened. Returns the
+/// exit code the process should use.
+pub fn report_startup_failure(error: &anyhow::Error) -> i32 {
+    let detail = format!("{error:#}");
+    error!(%detail, "The session could not start");
+    write_failure_status(&Failure {
+        reason: "config",
+        message: "This computer's connection settings could not be used.".to_owned(),
+        detail,
+    });
+    STARTUP_FAILURE_EXIT
 }
 
 impl App {
@@ -515,11 +580,19 @@ impl RpcApp {
             self.confirm_close(event_loop);
             return;
         }
+        // A window too small for the panel would swallow every event for a dialog
+        // nothing can draw, so close directly instead of asking.
+        let Some((window, _)) = self.window.as_ref() else {
+            self.confirm_close(event_loop);
+            return;
+        };
+        if !crate::modal::CloseDialog::fits(window.inner_size()) {
+            self.confirm_close(event_loop);
+            return;
+        }
         let computer = std::env::var("WINRDP_TITLE").unwrap_or_else(|_| "this computer".to_owned());
         self.close_dialog = Some(crate::modal::CloseDialog::new(computer));
-        if let Some((window, _)) = self.window.as_ref() {
-            window.request_redraw();
-        }
+        window.request_redraw();
     }
 
     /// Route a window event to the close dialog while it is up. Everything but
@@ -573,7 +646,10 @@ impl RpcApp {
     /// Close the session the way the window's close button does.
     fn confirm_close(&mut self, event_loop: &ActiveEventLoop) {
         match &self.input_target {
-            InputTarget::Direct(input_event_sender) => input_event_sender.request_graceful_close(),
+            InputTarget::Direct(input_event_sender) => match close_kind(!self.buffer.is_empty()) {
+                CloseKind::Cancel => input_event_sender.request_close(),
+                CloseKind::Graceful => input_event_sender.request_graceful_close(),
+            },
             InputTarget::Rpc(daemon) => {
                 let _ = daemon.disconnect();
                 daemon.shutdown();
@@ -587,10 +663,10 @@ impl RpcApp {
             self.resize_timeout = None;
             self.send_resize_event();
         }
-        if self.bar.tick(now) {
-            if let Some((window, _)) = self.window.as_ref() {
-                window.request_redraw();
-            }
+        if self.bar.tick(now)
+            && let Some((window, _)) = self.window.as_ref()
+        {
+            window.request_redraw();
         }
         let next = [self.resize_timeout, self.bar.deadline()].into_iter().flatten().min();
         event_loop.set_control_flow(match next {
@@ -783,10 +859,10 @@ impl RpcApp {
                         return;
                     }
                 }
-                #[expect(clippy::as_conversions, reason = "casting f64 to u16")]
-                let x = (position.x / f64::from(win_size.width) * f64::from(self.buffer_size.0)) as u16;
-                #[expect(clippy::as_conversions, reason = "casting f64 to u16")]
-                let y = (position.y / f64::from(win_size.height) * f64::from(self.buffer_size.1)) as u16;
+                let Some((x, y)) = remote_pointer((position.x, position.y), self.buffer_size) else {
+                    // Over the black padding beside a desktop smaller than the window.
+                    return;
+                };
                 let operation = ironrdp::input::Operation::MouseMove(ironrdp::input::MousePosition { x, y });
 
                 apply_and_send_fast_path_events(
@@ -1144,7 +1220,7 @@ mod tests {
     use ironrdp::connector::sspi::credssp::NStatusCode;
     use ironrdp::connector::{ConnectorError, ConnectorErrorKind, sspi};
 
-    use super::{WRONG_CREDENTIALS, connect_failure, escape, transport_status};
+    use super::{CloseKind, WRONG_CREDENTIALS, close_kind, connect_failure, escape, remote_pointer, transport_status};
 
     #[test]
     fn a_connected_session_still_publishes_the_transport_the_launcher_shows() {
@@ -1226,5 +1302,34 @@ mod tests {
     fn status_text_cannot_break_out_of_the_json_the_launcher_parses() {
         assert_eq!(escape("say \"hi\"\\ now"), "say \\\"hi\\\"\\\\ now");
         assert_eq!(escape("two\nlines\u{1}"), "two lines");
+    }
+
+    #[test]
+    fn a_failed_secure_handshake_is_not_reported_as_an_unreachable_computer() {
+        let error = ConnectorError::new("TLS upgrade", ConnectorErrorKind::Custom)
+            .with_source(std::io::Error::from(std::io::ErrorKind::UnexpectedEof));
+        let failure = connect_failure(&error);
+        assert_eq!(failure.reason, "protocol");
+        assert!(failure.message.contains("secure connection"), "{}", failure.message);
+    }
+
+    #[test]
+    fn closing_before_the_desktop_arrives_cancels_the_connection_attempt() {
+        assert_eq!(close_kind(false), CloseKind::Cancel);
+        assert_eq!(close_kind(true), CloseKind::Graceful);
+    }
+
+    #[test]
+    fn the_pointer_maps_onto_the_desktop_the_same_way_the_frame_is_drawn() {
+        // 1:1 from the top-left, exactly as draw() blits the frame.
+        assert_eq!(remote_pointer((0.0, 0.0), (1280, 720)), Some((0, 0)));
+        assert_eq!(remote_pointer((640.9, 360.2), (1280, 720)), Some((640, 360)));
+        // A window wider than the desktop pads the rest black; that is not the desktop.
+        assert_eq!(remote_pointer((1400.0, 100.0), (1280, 720)), None);
+        assert_eq!(remote_pointer((100.0, 800.0), (1280, 720)), None);
+        assert_eq!(remote_pointer((1280.0, 719.0), (1280, 720)), None);
+        assert_eq!(remote_pointer((-1.0, 10.0), (1280, 720)), None);
+        // A window smaller than the desktop clips the frame; every position is on it.
+        assert_eq!(remote_pointer((799.0, 599.0), (1280, 720)), Some((799, 599)));
     }
 }

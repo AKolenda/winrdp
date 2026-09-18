@@ -1,7 +1,7 @@
 {
   "target": "x86_64-unknown-linux-gnu",
   "scope": "Cargo default-feature dependency resolution for launcher and session, including build dependencies and excluding dev-only dependency edges; this is a conservative source inventory, not proof of code linked in each binary.",
-  "collection": "Collected from cached registry packages via cargo metadata --locked --offline --filter-platform x86_64-unknown-linux-gnu. Non-Linux targets were not downloaded or inspected. License texts retain their original upstream content.",
+  "collection": "Collected from cached registry packages via cargo metadata --locked --offline --filter-platform x86_64-unknown-linux-gnu. Non-Linux targets were not downloaded or inspected. License texts retain their original upstream content. Nineteen crates publish no licence file inside their crates.io archive; for those, the texts were collected verbatim from the crate's own upstream repository, pinned to the commit recorded in the archive's .cargo_vcs_info.json, and each package records that provenance under \"notice_source\".",
   "ironrdp_revision": "2a5f705c3b343ab25756d23986448e2406cb8b09",
   "limitations": [
     "Native dependencies compiled or linked by build scripts may require additional source notices.",
@@ -9,103 +9,7 @@
     "Upstream source download URLs and Cargo registry checksums identify exact crate archives; an offline vendor-source archive is not included."
   ],
   "package_count": 640,
-  "missing_license_text": [
-    {
-      "name": "alloc-stdlib",
-      "version": "0.2.4",
-      "license_expression": "BSD-3-Clause"
-    },
-    {
-      "name": "asn1-rs-impl",
-      "version": "0.2.0",
-      "license_expression": "MIT/Apache-2.0"
-    },
-    {
-      "name": "dasp_sample",
-      "version": "0.11.0",
-      "license_expression": "MIT OR Apache-2.0"
-    },
-    {
-      "name": "defmt-parser",
-      "version": "1.0.0",
-      "license_expression": "MIT OR Apache-2.0"
-    },
-    {
-      "name": "dlopen2",
-      "version": "0.8.2",
-      "license_expression": "MIT"
-    },
-    {
-      "name": "dlopen2_derive",
-      "version": "0.4.3",
-      "license_expression": "MIT"
-    },
-    {
-      "name": "drm-fourcc",
-      "version": "2.2.0",
-      "license_expression": "MIT"
-    },
-    {
-      "name": "inquire",
-      "version": "0.9.4",
-      "license_expression": "MIT"
-    },
-    {
-      "name": "libappindicator-sys",
-      "version": "0.9.0",
-      "license_expression": "Apache-2.0 OR MIT"
-    },
-    {
-      "name": "now-client",
-      "version": "0.1.0",
-      "license_expression": "MIT/Apache-2.0"
-    },
-    {
-      "name": "now-proto-pdu",
-      "version": "0.4.4",
-      "license_expression": "MIT/Apache-2.0"
-    },
-    {
-      "name": "rustcrypto-ff_derive",
-      "version": "0.14.0-rc.0",
-      "license_expression": "MIT/Apache-2.0"
-    },
-    {
-      "name": "selectors",
-      "version": "0.36.1",
-      "license_expression": "MPL-2.0"
-    },
-    {
-      "name": "unic-char-property",
-      "version": "0.9.0",
-      "license_expression": "MIT/Apache-2.0"
-    },
-    {
-      "name": "unic-char-range",
-      "version": "0.9.0",
-      "license_expression": "MIT/Apache-2.0"
-    },
-    {
-      "name": "unic-common",
-      "version": "0.9.0",
-      "license_expression": "MIT/Apache-2.0"
-    },
-    {
-      "name": "unic-ucd-ident",
-      "version": "0.9.0",
-      "license_expression": "MIT/Apache-2.0"
-    },
-    {
-      "name": "unic-ucd-version",
-      "version": "0.9.0",
-      "license_expression": "MIT/Apache-2.0"
-    },
-    {
-      "name": "winscard",
-      "version": "0.3.3",
-      "license_expression": "MIT/Apache-2.0"
-    }
-  ],
+  "missing_license_text": [],
   "packages": [
     {
       "name": "ab_glyph",
@@ -417,9 +321,27 @@
         "launcher"
       ],
       "features": [],
-      "notice_files": [],
+      "notice_files": [
+        {
+          "path": "licenses/rust/alloc-stdlib-0.2.4/LICENSE",
+          "sha256": "c0c56f26d9c051cac4d200c34c84e7ae9aaa853e01a982a1df08b09931e518ae"
+        }
+      ],
       "inherits_ironrdp_licenses": false,
-      "status": "missing_license_text"
+      "status": "collected",
+      "notice_source": {
+        "origin": "upstream repository",
+        "repository": "https://github.com/dropbox/rust-alloc-no-stdlib",
+        "commit": "ae42d22078b98549e987d2f03d12df7b984fde47",
+        "commit_source": ".cargo_vcs_info.json in the published crate archive",
+        "files": [
+          {
+            "file": "LICENSE",
+            "path_in_repo": "LICENSE",
+            "url": "https://raw.githubusercontent.com/dropbox/rust-alloc-no-stdlib/ae42d22078b98549e987d2f03d12df7b984fde47/LICENSE"
+          }
+        ]
+      }
     },
     {
       "name": "alsa",
@@ -780,9 +702,36 @@
         "session"
       ],
       "features": [],
-      "notice_files": [],
+      "notice_files": [
+        {
+          "path": "licenses/rust/asn1-rs-impl-0.2.0/LICENSE-APACHE",
+          "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2"
+        },
+        {
+          "path": "licenses/rust/asn1-rs-impl-0.2.0/LICENSE-MIT",
+          "sha256": "a5c61b93b6ee1d104af9920cf020ff3c7efe818e31fe562c72261847a728f513"
+        }
+      ],
       "inherits_ironrdp_licenses": false,
-      "status": "missing_license_text"
+      "status": "collected",
+      "notice_source": {
+        "origin": "upstream repository",
+        "repository": "https://github.com/rusticata/asn1-rs",
+        "commit": "a20e5f7319c896737ad0f2557037817b91ad854f",
+        "commit_source": ".cargo_vcs_info.json in the published crate archive",
+        "files": [
+          {
+            "file": "LICENSE-MIT",
+            "path_in_repo": "LICENSE-MIT",
+            "url": "https://raw.githubusercontent.com/rusticata/asn1-rs/a20e5f7319c896737ad0f2557037817b91ad854f/LICENSE-MIT"
+          },
+          {
+            "file": "LICENSE-APACHE",
+            "path_in_repo": "LICENSE-APACHE",
+            "url": "https://raw.githubusercontent.com/rusticata/asn1-rs/a20e5f7319c896737ad0f2557037817b91ad854f/LICENSE-APACHE"
+          }
+        ]
+      }
     },
     {
       "name": "async-recursion",
@@ -3031,9 +2980,41 @@
         "default",
         "std"
       ],
-      "notice_files": [],
+      "notice_files": [
+        {
+          "path": "licenses/rust/dasp_sample-0.11.0/LICENSE-APACHE",
+          "sha256": "756c8d2ab2dc24f256e1455b5f03937f4933d83d7bc9f2d55009fc962377d512"
+        },
+        {
+          "path": "licenses/rust/dasp_sample-0.11.0/LICENSE-MIT",
+          "sha256": "b1d6df41ed3aa96806e74c729444d7c121d90e6660a6aed01d298e03fde475a0"
+        },
+        {
+          "path": "licenses/rust/dasp_sample-0.11.0/NOTICE.md",
+          "sha256": "2699515c85f0c86c5ceee8913603822953597767f54dab4b038df76c00289e5b"
+        }
+      ],
       "inherits_ironrdp_licenses": false,
-      "status": "missing_license_text"
+      "status": "collected",
+      "notice_source": {
+        "origin": "upstream repository",
+        "repository": "https://github.com/RustAudio/dasp",
+        "commit": "97c3bb9b2363c0b46ac1633858bf1054fd02a980",
+        "commit_source": ".cargo_vcs_info.json in the published crate archive",
+        "files": [
+          {
+            "file": "LICENSE-MIT",
+            "path_in_repo": "LICENSE-MIT",
+            "url": "https://raw.githubusercontent.com/RustAudio/dasp/97c3bb9b2363c0b46ac1633858bf1054fd02a980/LICENSE-MIT"
+          },
+          {
+            "file": "LICENSE-APACHE",
+            "path_in_repo": "LICENSE-APACHE",
+            "url": "https://raw.githubusercontent.com/RustAudio/dasp/97c3bb9b2363c0b46ac1633858bf1054fd02a980/LICENSE-APACHE"
+          }
+        ],
+        "note": "Upstream ships the short Apache-2.0 application notice under the name LICENSE-APACHE rather than the full body of the Apache License 2.0; the MIT half of the \"MIT OR Apache-2.0\" expression is reproduced in full. See NOTICE.md in the notice directory."
+      }
     },
     {
       "name": "data-encoding",
@@ -3149,9 +3130,36 @@
         "launcher"
       ],
       "features": [],
-      "notice_files": [],
+      "notice_files": [
+        {
+          "path": "licenses/rust/defmt-parser-1.0.0/LICENSE-APACHE",
+          "sha256": "8173d5c29b4f956d532781d2b86e4e30f83e6b7878dce18c919451d6ba707c90"
+        },
+        {
+          "path": "licenses/rust/defmt-parser-1.0.0/LICENSE-MIT",
+          "sha256": "2710a622a896bba67356913d4d0492cab5465f61b2ecce6d880aeb483834fb50"
+        }
+      ],
       "inherits_ironrdp_licenses": false,
-      "status": "missing_license_text"
+      "status": "collected",
+      "notice_source": {
+        "origin": "upstream repository",
+        "repository": "https://github.com/knurling-rs/defmt",
+        "commit": "4a8cdb44891ed57b8ff5a023b6bec7137c48708f",
+        "commit_source": ".cargo_vcs_info.json in the published crate archive",
+        "files": [
+          {
+            "file": "LICENSE-MIT",
+            "path_in_repo": "LICENSE-MIT",
+            "url": "https://raw.githubusercontent.com/knurling-rs/defmt/4a8cdb44891ed57b8ff5a023b6bec7137c48708f/LICENSE-MIT"
+          },
+          {
+            "file": "LICENSE-APACHE",
+            "path_in_repo": "LICENSE-APACHE",
+            "url": "https://raw.githubusercontent.com/knurling-rs/defmt/4a8cdb44891ed57b8ff5a023b6bec7137c48708f/LICENSE-APACHE"
+          }
+        ]
+      }
     },
     {
       "name": "der",
@@ -3561,9 +3569,27 @@
         "symbor",
         "wrapper"
       ],
-      "notice_files": [],
+      "notice_files": [
+        {
+          "path": "licenses/rust/dlopen2-0.8.2/LICENSE",
+          "sha256": "39fa265207450e77c62e90c5594a06c085b655d8374c7ced4bf7894b6bd95dd2"
+        }
+      ],
       "inherits_ironrdp_licenses": false,
-      "status": "missing_license_text"
+      "status": "collected",
+      "notice_source": {
+        "origin": "upstream repository",
+        "repository": "https://github.com/OpenByteDev/dlopen2",
+        "commit": "cc80e4a0a90d499b677fdf7743699b4b3a43a989",
+        "commit_source": ".cargo_vcs_info.json in the published crate archive",
+        "files": [
+          {
+            "file": "LICENSE",
+            "path_in_repo": "LICENSE",
+            "url": "https://raw.githubusercontent.com/OpenByteDev/dlopen2/cc80e4a0a90d499b677fdf7743699b4b3a43a989/LICENSE"
+          }
+        ]
+      }
     },
     {
       "name": "dlopen2_derive",
@@ -3577,9 +3603,27 @@
         "launcher"
       ],
       "features": [],
-      "notice_files": [],
+      "notice_files": [
+        {
+          "path": "licenses/rust/dlopen2_derive-0.4.3/LICENSE",
+          "sha256": "39fa265207450e77c62e90c5594a06c085b655d8374c7ced4bf7894b6bd95dd2"
+        }
+      ],
       "inherits_ironrdp_licenses": false,
-      "status": "missing_license_text"
+      "status": "collected",
+      "notice_source": {
+        "origin": "upstream repository",
+        "repository": "https://github.com/OpenByteDev/dlopen2",
+        "commit": "cc80e4a0a90d499b677fdf7743699b4b3a43a989",
+        "commit_source": ".cargo_vcs_info.json in the published crate archive",
+        "files": [
+          {
+            "file": "LICENSE",
+            "path_in_repo": "LICENSE",
+            "url": "https://raw.githubusercontent.com/OpenByteDev/dlopen2/cc80e4a0a90d499b677fdf7743699b4b3a43a989/LICENSE"
+          }
+        ]
+      }
     },
     {
       "name": "document-features",
@@ -3744,9 +3788,28 @@
         "default",
         "std"
       ],
-      "notice_files": [],
+      "notice_files": [
+        {
+          "path": "licenses/rust/drm-fourcc-2.2.0/LICENSE",
+          "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3"
+        }
+      ],
       "inherits_ironrdp_licenses": false,
-      "status": "missing_license_text"
+      "status": "collected",
+      "notice_source": {
+        "origin": "upstream repository",
+        "repository": "https://github.com/danielzfranklin/drm-fourcc-rs",
+        "commit": "bb1b81f184650e1418e1dce512e34071675206d7",
+        "commit_source": "later upstream commit \"Add license text\" (2023-07-23)",
+        "files": [
+          {
+            "file": "LICENSE",
+            "path_in_repo": "LICENSE",
+            "url": "https://raw.githubusercontent.com/danielzfranklin/drm-fourcc-rs/bb1b81f184650e1418e1dce512e34071675206d7/LICENSE"
+          }
+        ],
+        "note": "The 2.2.0 archive was published from 7b9f80060ffd4b35cd236437e65a17fb517d163c (per .cargo_vcs_info.json), a revision that carried no licence file. The MIT text reproduced here was added upstream afterwards, in commit bb1b81f184650e1418e1dce512e34071675206d7, and is the only licence text the project has published for this crate."
+      }
     },
     {
       "name": "drm-sys",
@@ -6513,9 +6576,27 @@
         "macros",
         "one-liners"
       ],
-      "notice_files": [],
+      "notice_files": [
+        {
+          "path": "licenses/rust/inquire-0.9.4/LICENSE",
+          "sha256": "f72340c0a3886a23409003bddfd1aeab6c64acd128582ef4436e1ad5ae2033c8"
+        }
+      ],
       "inherits_ironrdp_licenses": false,
-      "status": "missing_license_text"
+      "status": "collected",
+      "notice_source": {
+        "origin": "upstream repository",
+        "repository": "https://github.com/mikaelmello/inquire",
+        "commit": "3d5b65422a247acc773d767558e34fcb69ab04bf",
+        "commit_source": ".cargo_vcs_info.json in the published crate archive",
+        "files": [
+          {
+            "file": "LICENSE",
+            "path_in_repo": "LICENSE",
+            "url": "https://raw.githubusercontent.com/mikaelmello/inquire/3d5b65422a247acc773d767558e34fcb69ab04bf/LICENSE"
+          }
+        ]
+      }
     },
     {
       "name": "ipnet",
@@ -8123,9 +8204,36 @@
         "backcompat",
         "default"
       ],
-      "notice_files": [],
+      "notice_files": [
+        {
+          "path": "licenses/rust/libappindicator-sys-0.9.0/LICENSE-APACHE",
+          "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2"
+        },
+        {
+          "path": "licenses/rust/libappindicator-sys-0.9.0/LICENSE-MIT",
+          "sha256": "eb227437252b2a7a9c1fc342c93ade1f3d7ce38cc6dd754f613db07d53ceff0b"
+        }
+      ],
       "inherits_ironrdp_licenses": false,
-      "status": "missing_license_text"
+      "status": "collected",
+      "notice_source": {
+        "origin": "upstream repository",
+        "repository": "https://github.com/tauri-apps/libappindicator-rs",
+        "commit": "eafd1e3682a1247f595410266091e9684021cb6f",
+        "commit_source": ".cargo_vcs_info.json in the published crate archive",
+        "files": [
+          {
+            "file": "LICENSE-APACHE",
+            "path_in_repo": "LICENSE-APACHE",
+            "url": "https://raw.githubusercontent.com/tauri-apps/libappindicator-rs/eafd1e3682a1247f595410266091e9684021cb6f/LICENSE-APACHE"
+          },
+          {
+            "file": "LICENSE-MIT",
+            "path_in_repo": "LICENSE-MIT",
+            "url": "https://raw.githubusercontent.com/tauri-apps/libappindicator-rs/eafd1e3682a1247f595410266091e9684021cb6f/LICENSE-MIT"
+          }
+        ]
+      }
     },
     {
       "name": "libc",
@@ -9093,9 +9201,36 @@
         "session"
       ],
       "features": [],
-      "notice_files": [],
+      "notice_files": [
+        {
+          "path": "licenses/rust/now-client-0.1.0/LICENSE-APACHE",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+        },
+        {
+          "path": "licenses/rust/now-client-0.1.0/LICENSE-MIT",
+          "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3"
+        }
+      ],
       "inherits_ironrdp_licenses": false,
-      "status": "missing_license_text"
+      "status": "collected",
+      "notice_source": {
+        "origin": "upstream repository",
+        "repository": "https://github.com/Devolutions/now-libraries",
+        "commit": "9e1ea0a2283457b52c1eb4426f68ce9cca096b04",
+        "commit_source": ".cargo_vcs_info.json in the published crate archive",
+        "files": [
+          {
+            "file": "LICENSE-MIT",
+            "path_in_repo": "LICENSE-MIT",
+            "url": "https://raw.githubusercontent.com/Devolutions/now-libraries/9e1ea0a2283457b52c1eb4426f68ce9cca096b04/LICENSE-MIT"
+          },
+          {
+            "file": "LICENSE-APACHE",
+            "path_in_repo": "LICENSE-APACHE",
+            "url": "https://raw.githubusercontent.com/Devolutions/now-libraries/9e1ea0a2283457b52c1eb4426f68ce9cca096b04/LICENSE-APACHE"
+          }
+        ]
+      }
     },
     {
       "name": "now-proto-pdu",
@@ -9112,9 +9247,36 @@
         "default",
         "std"
       ],
-      "notice_files": [],
+      "notice_files": [
+        {
+          "path": "licenses/rust/now-proto-pdu-0.4.4/LICENSE-APACHE",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+        },
+        {
+          "path": "licenses/rust/now-proto-pdu-0.4.4/LICENSE-MIT",
+          "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3"
+        }
+      ],
       "inherits_ironrdp_licenses": false,
-      "status": "missing_license_text"
+      "status": "collected",
+      "notice_source": {
+        "origin": "upstream repository",
+        "repository": "https://github.com/Devolutions/now-libraries",
+        "commit": "1a3b8005e73afcc534ffb669ad0505be2b89906e",
+        "commit_source": ".cargo_vcs_info.json in the published crate archive",
+        "files": [
+          {
+            "file": "LICENSE-MIT",
+            "path_in_repo": "LICENSE-MIT",
+            "url": "https://raw.githubusercontent.com/Devolutions/now-libraries/1a3b8005e73afcc534ffb669ad0505be2b89906e/LICENSE-MIT"
+          },
+          {
+            "file": "LICENSE-APACHE",
+            "path_in_repo": "LICENSE-APACHE",
+            "url": "https://raw.githubusercontent.com/Devolutions/now-libraries/1a3b8005e73afcc534ffb669ad0505be2b89906e/LICENSE-APACHE"
+          }
+        ]
+      }
     },
     {
       "name": "nu-ansi-term",
@@ -11709,9 +11871,36 @@
       "features": [
         "bits"
       ],
-      "notice_files": [],
+      "notice_files": [
+        {
+          "path": "licenses/rust/rustcrypto-ff_derive-0.14.0-rc.0/LICENSE-APACHE",
+          "sha256": "3708458dee7f359ac6c9c5558023ed481be87e5372c43ebd7f2ca7ad23c12026"
+        },
+        {
+          "path": "licenses/rust/rustcrypto-ff_derive-0.14.0-rc.0/LICENSE-MIT",
+          "sha256": "8d0c1d1d4b2bebf5b9211f0e883d5a482b7808f3ed31320da14ddee95811f4ef"
+        }
+      ],
       "inherits_ironrdp_licenses": false,
-      "status": "missing_license_text"
+      "status": "collected",
+      "notice_source": {
+        "origin": "upstream repository",
+        "repository": "https://github.com/zkcrypto/ff",
+        "commit": "8417973539baabf561975144e0a68d166d0f9a95",
+        "commit_source": ".cargo_vcs_info.json in the published crate archive",
+        "files": [
+          {
+            "file": "LICENSE-APACHE",
+            "path_in_repo": "LICENSE-APACHE",
+            "url": "https://raw.githubusercontent.com/zkcrypto/ff/8417973539baabf561975144e0a68d166d0f9a95/LICENSE-APACHE"
+          },
+          {
+            "file": "LICENSE-MIT",
+            "path_in_repo": "LICENSE-MIT",
+            "url": "https://raw.githubusercontent.com/zkcrypto/ff/8417973539baabf561975144e0a68d166d0f9a95/LICENSE-MIT"
+          }
+        ]
+      }
     },
     {
       "name": "rustcrypto-group",
@@ -12313,9 +12502,32 @@
         "launcher"
       ],
       "features": [],
-      "notice_files": [],
+      "notice_files": [
+        {
+          "path": "licenses/rust/selectors-0.36.1/LICENSE-MPL-2.0",
+          "sha256": "3f3d9e0024b1921b067d6f7f88deb4a60cbe7a78e76c64e3f1d7fc3b779b9d04"
+        },
+        {
+          "path": "licenses/rust/selectors-0.36.1/NOTICE.md",
+          "sha256": "354864a71f775af1ab4e0676ceaa9cdb913db4827fa2819f58894645d9ed4e98"
+        }
+      ],
       "inherits_ironrdp_licenses": false,
-      "status": "missing_license_text"
+      "status": "collected",
+      "notice_source": {
+        "origin": "canonical licence text (not present upstream)",
+        "repository": "https://github.com/servo/stylo",
+        "commit": "635e1a19d02960588a00e189bd4bd5bdb150ec3d",
+        "commit_source": ".cargo_vcs_info.json in the published crate archive",
+        "files": [
+          {
+            "file": "LICENSE-MPL-2.0",
+            "path_in_repo": null,
+            "url": "https://www.mozilla.org/media/MPL/2.0/index.txt"
+          }
+        ],
+        "note": "Neither the published archive nor servo/stylo at the publish commit carries a copy of the MPL-2.0 text the crate declares. The canonical Mozilla text is reproduced so that this distribution carries the licence MPL-2.0 section 3.2 requires. See NOTICE.md in the notice directory."
+      }
     },
     {
       "name": "semver",
@@ -15590,9 +15802,45 @@
         "launcher"
       ],
       "features": [],
-      "notice_files": [],
+      "notice_files": [
+        {
+          "path": "licenses/rust/unic-char-property-0.9.0/COPYRIGHT.md",
+          "sha256": "f5c342c49f3ac804f3e8e7bb62a8040a44c50d47bb36902b1abd13f66a1adf8b"
+        },
+        {
+          "path": "licenses/rust/unic-char-property-0.9.0/LICENSE-APACHE",
+          "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2"
+        },
+        {
+          "path": "licenses/rust/unic-char-property-0.9.0/LICENSE-MIT",
+          "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3"
+        }
+      ],
       "inherits_ironrdp_licenses": false,
-      "status": "missing_license_text"
+      "status": "collected",
+      "notice_source": {
+        "origin": "upstream repository",
+        "repository": "https://github.com/open-i18n/rust-unic",
+        "commit": "5878605364af97a3358368a6eaef02104af2e016",
+        "commit_source": ".cargo_vcs_info.json in the published crate archive",
+        "files": [
+          {
+            "file": "LICENSE-MIT",
+            "path_in_repo": "LICENSE-MIT",
+            "url": "https://raw.githubusercontent.com/open-i18n/rust-unic/5878605364af97a3358368a6eaef02104af2e016/LICENSE-MIT"
+          },
+          {
+            "file": "LICENSE-APACHE",
+            "path_in_repo": "LICENSE-APACHE",
+            "url": "https://raw.githubusercontent.com/open-i18n/rust-unic/5878605364af97a3358368a6eaef02104af2e016/LICENSE-APACHE"
+          },
+          {
+            "file": "COPYRIGHT.md",
+            "path_in_repo": "COPYRIGHT.md",
+            "url": "https://raw.githubusercontent.com/open-i18n/rust-unic/5878605364af97a3358368a6eaef02104af2e016/COPYRIGHT.md"
+          }
+        ]
+      }
     },
     {
       "name": "unic-char-range",
@@ -15608,9 +15856,45 @@
       "features": [
         "default"
       ],
-      "notice_files": [],
+      "notice_files": [
+        {
+          "path": "licenses/rust/unic-char-range-0.9.0/COPYRIGHT.md",
+          "sha256": "f5c342c49f3ac804f3e8e7bb62a8040a44c50d47bb36902b1abd13f66a1adf8b"
+        },
+        {
+          "path": "licenses/rust/unic-char-range-0.9.0/LICENSE-APACHE",
+          "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2"
+        },
+        {
+          "path": "licenses/rust/unic-char-range-0.9.0/LICENSE-MIT",
+          "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3"
+        }
+      ],
       "inherits_ironrdp_licenses": false,
-      "status": "missing_license_text"
+      "status": "collected",
+      "notice_source": {
+        "origin": "upstream repository",
+        "repository": "https://github.com/open-i18n/rust-unic",
+        "commit": "5878605364af97a3358368a6eaef02104af2e016",
+        "commit_source": ".cargo_vcs_info.json in the published crate archive",
+        "files": [
+          {
+            "file": "LICENSE-MIT",
+            "path_in_repo": "LICENSE-MIT",
+            "url": "https://raw.githubusercontent.com/open-i18n/rust-unic/5878605364af97a3358368a6eaef02104af2e016/LICENSE-MIT"
+          },
+          {
+            "file": "LICENSE-APACHE",
+            "path_in_repo": "LICENSE-APACHE",
+            "url": "https://raw.githubusercontent.com/open-i18n/rust-unic/5878605364af97a3358368a6eaef02104af2e016/LICENSE-APACHE"
+          },
+          {
+            "file": "COPYRIGHT.md",
+            "path_in_repo": "COPYRIGHT.md",
+            "url": "https://raw.githubusercontent.com/open-i18n/rust-unic/5878605364af97a3358368a6eaef02104af2e016/COPYRIGHT.md"
+          }
+        ]
+      }
     },
     {
       "name": "unic-common",
@@ -15626,9 +15910,45 @@
       "features": [
         "default"
       ],
-      "notice_files": [],
+      "notice_files": [
+        {
+          "path": "licenses/rust/unic-common-0.9.0/COPYRIGHT.md",
+          "sha256": "f5c342c49f3ac804f3e8e7bb62a8040a44c50d47bb36902b1abd13f66a1adf8b"
+        },
+        {
+          "path": "licenses/rust/unic-common-0.9.0/LICENSE-APACHE",
+          "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2"
+        },
+        {
+          "path": "licenses/rust/unic-common-0.9.0/LICENSE-MIT",
+          "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3"
+        }
+      ],
       "inherits_ironrdp_licenses": false,
-      "status": "missing_license_text"
+      "status": "collected",
+      "notice_source": {
+        "origin": "upstream repository",
+        "repository": "https://github.com/open-i18n/rust-unic",
+        "commit": "5878605364af97a3358368a6eaef02104af2e016",
+        "commit_source": ".cargo_vcs_info.json in the published crate archive",
+        "files": [
+          {
+            "file": "LICENSE-MIT",
+            "path_in_repo": "LICENSE-MIT",
+            "url": "https://raw.githubusercontent.com/open-i18n/rust-unic/5878605364af97a3358368a6eaef02104af2e016/LICENSE-MIT"
+          },
+          {
+            "file": "LICENSE-APACHE",
+            "path_in_repo": "LICENSE-APACHE",
+            "url": "https://raw.githubusercontent.com/open-i18n/rust-unic/5878605364af97a3358368a6eaef02104af2e016/LICENSE-APACHE"
+          },
+          {
+            "file": "COPYRIGHT.md",
+            "path_in_repo": "COPYRIGHT.md",
+            "url": "https://raw.githubusercontent.com/open-i18n/rust-unic/5878605364af97a3358368a6eaef02104af2e016/COPYRIGHT.md"
+          }
+        ]
+      }
     },
     {
       "name": "unic-ucd-ident",
@@ -15646,9 +15966,45 @@
         "id",
         "xid"
       ],
-      "notice_files": [],
+      "notice_files": [
+        {
+          "path": "licenses/rust/unic-ucd-ident-0.9.0/COPYRIGHT.md",
+          "sha256": "f5c342c49f3ac804f3e8e7bb62a8040a44c50d47bb36902b1abd13f66a1adf8b"
+        },
+        {
+          "path": "licenses/rust/unic-ucd-ident-0.9.0/LICENSE-APACHE",
+          "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2"
+        },
+        {
+          "path": "licenses/rust/unic-ucd-ident-0.9.0/LICENSE-MIT",
+          "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3"
+        }
+      ],
       "inherits_ironrdp_licenses": false,
-      "status": "missing_license_text"
+      "status": "collected",
+      "notice_source": {
+        "origin": "upstream repository",
+        "repository": "https://github.com/open-i18n/rust-unic",
+        "commit": "8a6ce83063d90b91ae2ce59eddb803edd393fca9",
+        "commit_source": ".cargo_vcs_info.json in the published crate archive",
+        "files": [
+          {
+            "file": "LICENSE-MIT",
+            "path_in_repo": "LICENSE-MIT",
+            "url": "https://raw.githubusercontent.com/open-i18n/rust-unic/8a6ce83063d90b91ae2ce59eddb803edd393fca9/LICENSE-MIT"
+          },
+          {
+            "file": "LICENSE-APACHE",
+            "path_in_repo": "LICENSE-APACHE",
+            "url": "https://raw.githubusercontent.com/open-i18n/rust-unic/8a6ce83063d90b91ae2ce59eddb803edd393fca9/LICENSE-APACHE"
+          },
+          {
+            "file": "COPYRIGHT.md",
+            "path_in_repo": "COPYRIGHT.md",
+            "url": "https://raw.githubusercontent.com/open-i18n/rust-unic/8a6ce83063d90b91ae2ce59eddb803edd393fca9/COPYRIGHT.md"
+          }
+        ]
+      }
     },
     {
       "name": "unic-ucd-version",
@@ -15662,9 +16018,45 @@
         "launcher"
       ],
       "features": [],
-      "notice_files": [],
+      "notice_files": [
+        {
+          "path": "licenses/rust/unic-ucd-version-0.9.0/COPYRIGHT.md",
+          "sha256": "f5c342c49f3ac804f3e8e7bb62a8040a44c50d47bb36902b1abd13f66a1adf8b"
+        },
+        {
+          "path": "licenses/rust/unic-ucd-version-0.9.0/LICENSE-APACHE",
+          "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2"
+        },
+        {
+          "path": "licenses/rust/unic-ucd-version-0.9.0/LICENSE-MIT",
+          "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3"
+        }
+      ],
       "inherits_ironrdp_licenses": false,
-      "status": "missing_license_text"
+      "status": "collected",
+      "notice_source": {
+        "origin": "upstream repository",
+        "repository": "https://github.com/open-i18n/rust-unic",
+        "commit": "5878605364af97a3358368a6eaef02104af2e016",
+        "commit_source": ".cargo_vcs_info.json in the published crate archive",
+        "files": [
+          {
+            "file": "LICENSE-MIT",
+            "path_in_repo": "LICENSE-MIT",
+            "url": "https://raw.githubusercontent.com/open-i18n/rust-unic/5878605364af97a3358368a6eaef02104af2e016/LICENSE-MIT"
+          },
+          {
+            "file": "LICENSE-APACHE",
+            "path_in_repo": "LICENSE-APACHE",
+            "url": "https://raw.githubusercontent.com/open-i18n/rust-unic/5878605364af97a3358368a6eaef02104af2e016/LICENSE-APACHE"
+          },
+          {
+            "file": "COPYRIGHT.md",
+            "path_in_repo": "COPYRIGHT.md",
+            "url": "https://raw.githubusercontent.com/open-i18n/rust-unic/5878605364af97a3358368a6eaef02104af2e016/COPYRIGHT.md"
+          }
+        ]
+      }
     },
     {
       "name": "unicode-ident",
@@ -16672,9 +17064,36 @@
         "session"
       ],
       "features": [],
-      "notice_files": [],
+      "notice_files": [
+        {
+          "path": "licenses/rust/winscard-0.3.3/LICENSE-APACHE",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+        },
+        {
+          "path": "licenses/rust/winscard-0.3.3/LICENSE-MIT",
+          "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3"
+        }
+      ],
       "inherits_ironrdp_licenses": false,
-      "status": "missing_license_text"
+      "status": "collected",
+      "notice_source": {
+        "origin": "upstream repository",
+        "repository": "https://github.com/devolutions/sspi-rs",
+        "commit": "fb5ce085e48c337b03968349f5e2e85c83959754",
+        "commit_source": ".cargo_vcs_info.json in the published crate archive",
+        "files": [
+          {
+            "file": "LICENSE-MIT",
+            "path_in_repo": "LICENSE-MIT",
+            "url": "https://raw.githubusercontent.com/devolutions/sspi-rs/fb5ce085e48c337b03968349f5e2e85c83959754/LICENSE-MIT"
+          },
+          {
+            "file": "LICENSE-APACHE",
+            "path_in_repo": "LICENSE-APACHE",
+            "url": "https://raw.githubusercontent.com/devolutions/sspi-rs/fb5ce085e48c337b03968349f5e2e85c83959754/LICENSE-APACHE"
+          }
+        ]
+      }
     },
     {
       "name": "wl-clipboard-rs",
@@ -17452,6 +17871,29 @@
       ],
       "inherits_ironrdp_licenses": false,
       "status": "collected"
+    }
+  ],
+  "notice_exceptions": [
+    {
+      "name": "selectors",
+      "version": "0.36.1",
+      "license_expression": "MPL-2.0",
+      "issue": "No licence text exists in the published archive or in the upstream repository at the publish commit.",
+      "resolution": "The canonical Mozilla Public License 2.0 text is reproduced as licenses/rust/selectors-0.36.1/LICENSE-MPL-2.0, with provenance recorded in that directory's NOTICE.md."
+    },
+    {
+      "name": "dasp_sample",
+      "version": "0.11.0",
+      "license_expression": "MIT OR Apache-2.0",
+      "issue": "Upstream ships the short Apache-2.0 application notice under the name LICENSE-APACHE, not the full body of the Apache License 2.0.",
+      "resolution": "The upstream file is reproduced verbatim and the MIT half of the disjunction is complete; see licenses/rust/dasp_sample-0.11.0/NOTICE.md."
+    },
+    {
+      "name": "drm-fourcc",
+      "version": "2.2.0",
+      "license_expression": "MIT",
+      "issue": "The revision 2.2.0 was published from carried no licence file; the MIT text was added upstream in 2023, after the release.",
+      "resolution": "The later upstream MIT text is reproduced and the commit is recorded in \"notice_source\"."
     }
   ]
 }

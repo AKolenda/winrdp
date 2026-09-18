@@ -18,7 +18,8 @@ connect—with click rings at each target. Motion is CSS-only and disabled for
 people who prefer reduced motion; the site requires no client JavaScript.
 
 The primary-source prototype is preserved on the `prototype/release-website`
-branch. Run `cd website && npm run prototype`, then open
+branch, and so is the `npm run prototype` script that serves it. Run
+`git switch prototype/release-website && cd website && npm run prototype`, then open
 `http://127.0.0.1:8090/prototype.html?variant=A`. Arrow keys and the floating
 switcher cycle the variants. The branch is throwaway and is not deployed.
 Production includes only the selected implementation under `website/public/`.

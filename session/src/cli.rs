@@ -294,7 +294,14 @@ impl ViewerConfig {
         I: IntoIterator<Item = T>,
         T: Into<std::ffi::OsString> + Clone,
     {
-        let args = Args::parse_from(args);
+        // `parse_from` exits the process itself, which would bypass the status file
+        // the launcher reads. `--help` and `--version` still arrive here as errors
+        // and are printed the way clap would have printed them.
+        let args = match Args::try_parse_from(args) {
+            Ok(args) => args,
+            Err(error) if !error.use_stderr() => error.exit(),
+            Err(error) => return Err(anyhow::Error::new(error).context("command line")),
+        };
 
         let mut properties = ironrdp_propertyset::PropertySet::new();
 

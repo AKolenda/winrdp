@@ -9,7 +9,7 @@ from __future__ import annotations
 import argparse, hashlib, json, os, re, shutil, subprocess, sys, tempfile
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
-VERSION='0.7.6'
+VERSION='0.7.7'
 
 def command(args, *, cwd=None, env=None):
     result=subprocess.run([str(a) for a in args],cwd=cwd,env=env,text=True,
@@ -33,15 +33,42 @@ def linked(path, env):
 def inside(path, root):
     return root is not None and path.resolve().is_relative_to(root.resolve())
 
-def owned_system_library(path):
+def owning_package(path):
     options={str(path),str(path.resolve())}
     if str(path).startswith('/usr/lib/'):options.add(str(path).replace('/usr/lib/','/lib/',1))
     if str(path).startswith('/lib/'):options.add('/usr'+str(path))
     for option in options:
         result=subprocess.run(['dpkg-query','-S',option],text=True,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,timeout=10)
-        if result.returncode==0:return
-    raise RuntimeError(f'System library is not owned by an installed Debian package: {path}. '
-                       'Use a matching, packaged build environment; not an arbitrary local library.')
+        if result.returncode==0:return result.stdout.partition(':')[0].strip()
+    return None
+
+def owned_system_library(path):
+    if owning_package(path) is None:
+        raise RuntimeError(f'System library is not owned by an installed Debian package: {path}. '
+                           'Use a matching, packaged build environment; not an arbitrary local library.')
+
+def dlopen_dependencies(binary, env):
+    """Packages for libraries a binary loads with dlopen.
+
+    dpkg-shlibdeps only reads ELF NEEDED entries, so the X11 and Wayland libraries
+    winit and xkbcommon open at run time produce no dependency at all. Without them
+    a clean installation has no session window."""
+    output=command(['strings','-a',binary])
+    already=set(linked(binary,env))
+    packages={}
+    cache=command(['ldconfig','-p'])
+    resolved={}
+    for line in cache.splitlines():
+        m=re.match(r'\s*(\S+)\s+\(libc6,x86-64.*?\)\s+=>\s+(\S+)',line)
+        if m:resolved.setdefault(m[1],Path(m[2]))
+    for soname in sorted(set(re.findall(r'lib[A-Za-z0-9_+-]+\.so\.[0-9]+',output))):
+        if soname in already or soname not in resolved:continue
+        name=owning_package(resolved[soname])
+        if name is None:
+            raise RuntimeError(f'{soname} is opened at run time but no installed package owns '
+                               f'{resolved[soname]}; refusing to create an under-declared .deb.')
+        packages[name]=soname
+    return packages
 
 def write(path, value, mode=0o644):
     path.parent.mkdir(parents=True,exist_ok=True);path.write_text(value);path.chmod(mode)
@@ -110,13 +137,29 @@ def package(binary, runtime, output, session=None):
         # inspected explicitly below. Every non-private ELF dependency was checked
         # for a dpkg owner above before --ignore-missing-info is used.
         write(temp/'debian/control','Source: winrdp-next\nSection: net\nPriority: optional\nMaintainer: Win RDP project <build@localhost>\n\nPackage: winrdp-next\nArchitecture: any\nDescription: Win RDP desktop client\n')
+        # dpkg-shlibdeps expands the binaries' $ORIGIN run paths against the package
+        # build tree, which it locates by the DEBIAN/control above them. Without this
+        # file in place first, the bundled Qt and FreeRDP libraries resolve to the
+        # build host's system copies and the package depends on the very libraries it
+        # ships, pinned to this distribution's ABI.
+        write(stage/'DEBIAN/control',f'Package: winrdp-next\nVersion: {VERSION}\nArchitecture: {arch}\nMaintainer: Win RDP project <build@localhost>\nDescription: Win RDP desktop client\n')
         elves=[installed]+([session_installed] if session_installed else [])+[private/name for name in private_sources]+[dest for _,dest in plugin_sources]
         result=command(['dpkg-shlibdeps','-O','--ignore-missing-info',f'-l{private}']+['-e'+str(p) for p in elves],cwd=temp,env=clean_env)
         deps=next((line.partition('=')[2] for line in result.splitlines() if line.startswith('shlibs:Depends=')),None)
         if not deps or 'libc6' not in deps or 'libwebkit2gtk-4.1-0' not in deps:
             raise RuntimeError('Could not derive complete runtime dependencies; refusing to create .deb.\n'+result)
+        bundled=[name for name in re.findall(r'[a-z0-9][a-z0-9.+-]*',deps)
+                 if name.startswith(('libqt6','qt6-','libfreerdp','libwinpr'))]
+        if bundled:
+            raise RuntimeError('Runtime dependencies name libraries this package bundles: '
+                               +', '.join(sorted(set(bundled)))+'\n'
+                               'dpkg-shlibdeps resolved them against the build host instead of the '
+                               'staged private runtime; refusing to create .deb.\n'+result)
+        runtime_loaded=dlopen_dependencies(session_installed,clean_env) if session_installed else {}
+        declared={clause.split()[0] for clause in deps.split(',') if clause.strip()}
+        deps=', '.join([deps,'fonts-dejavu-core']+sorted(set(runtime_loaded)-declared))
         size=sum(p.stat().st_size for p in stage.rglob('*') if p.is_file())//1024
-        write(stage/'DEBIAN/control',f'Package: winrdp-next\nVersion: {VERSION}\nArchitecture: {arch}\nSection: net\nPriority: optional\nMaintainer: Win RDP project <build@localhost>\nInstalled-Size: {size}\nDepends: {deps}, fonts-dejavu-core\nDescription: Win RDP desktop client for Linux\n Rust-powered IronRDP sessions and a native GTK desktop surface.\n This package installs a client only; it does not enable an RDP host service.\n')
+        write(stage/'DEBIAN/control',f'Package: winrdp-next\nVersion: {VERSION}\nArchitecture: {arch}\nSection: net\nPriority: optional\nMaintainer: Win RDP project <build@localhost>\nInstalled-Size: {size}\nDepends: {deps}\nDescription: Win RDP desktop client for Linux\n Rust-powered IronRDP sessions and a native GTK desktop surface.\n This package installs a client only; it does not enable an RDP host service.\n')
         write(stage/'DEBIAN/postinst','#!/bin/sh\nset -e\nif command -v update-desktop-database >/dev/null; then update-desktop-database -q /usr/share/applications || true; fi\nif command -v gtk-update-icon-cache >/dev/null; then gtk-update-icon-cache -q -t /usr/share/icons/hicolor || true; fi\n',0o755)
         manifest=[]
         for p in sorted(stage.rglob('*')):

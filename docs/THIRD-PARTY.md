@@ -46,6 +46,11 @@ source revision identifiers should accompany the GitHub release.
 
 Rust normal/build dependency inventory for Linux x86_64 is recorded in
 [rust-dependency-notices.json](rust-dependency-notices.json). Exact registry archive
-checksums and source URLs are included. 621 of 640 packages have collected upstream
-license/notice text under `licenses/rust/`; 19 missing upstream license texts are
-explicitly listed. This inventory is not a completed binary redistribution audit.
+checksums and source URLs are included. All 640 packages have collected upstream
+license/notice text under `licenses/rust/`. Nineteen crates ship no licence file inside
+their crates.io archive; their texts were taken verbatim from the crate's own upstream
+repository, pinned to the commit recorded in the archive's `.cargo_vcs_info.json`, and each
+such package records that provenance under `notice_source`. Three crates needed an
+explanation rather than a straight copy and are listed under `notice_exceptions`, with the
+reasoning repeated in a `NOTICE.md` beside the affected texts. This inventory is not a
+completed binary redistribution audit.

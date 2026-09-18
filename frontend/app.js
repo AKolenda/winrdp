@@ -1,6 +1,9 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 'use strict';
 const $ = id => document.getElementById(id);
+// The version the browser preview reports, and so the one the published
+// screenshots show. scripts/check-release.py keeps it at the package version.
+const PREVIEW_VERSION = '0.7.7';
 const nativeMode = Boolean(window.__TAURI__?.core?.invoke);
 let library = {version:1, computers:[], preferences:{dark:false,layout:'simple'}};
 let engine='freerdp', version='', localUser='';
@@ -24,8 +27,10 @@ $('message').querySelector('button').onclick=()=>{clearTimeout(messageTimer);$('
 function run(fn) { return (...args)=>{try{return Promise.resolve(fn(...args)).catch(e=>message(e.message||e));}catch(e){message(e.message||e);}}; }
 async function invoke(command, payload={}) {
   if(nativeMode) return window.__TAURI__.core.invoke(command,payload);
-  // Browser preview: enough of the backend to walk the screens.
-  if(command==='bootstrap') return {library,version:'0.7.4',engine:'ironrdp',user:'alex',native:{attached:false,backend:'Browser preview'}};
+  // Browser preview: enough of the backend to walk the screens. PREVIEW_VERSION is
+  // what the published screenshots show, so scripts/check-release.py keeps it in
+  // step with the package version.
+  if(command==='bootstrap') return {library,version:PREVIEW_VERSION,engine:'ironrdp',user:'alex',native:{attached:false,backend:'Browser preview'}};
   if(command==='save_profile') {
     const p=structuredClone(payload.profile); p.id ||= crypto.randomUUID();
     library.computers=library.computers.filter(x=>x.id!==p.id); library.computers.push(p); return library;
@@ -282,6 +287,10 @@ function promptPassword(id, refused='') {
   const p=library.computers.find(x=>x.id===id); if(!p) return;
   if(!nativeMode){message('Browser preview only. No remote connections are made.');return;}
   if(!p.username){editComputer(id,true);return;}
+  // A refusal can land while the user is already typing into a dialog for another
+  // computer. Re-pointing that dialog would send the password they are typing to
+  // a different host, so report the refusal and leave the open dialog alone.
+  if($('password-dialog').open){ if(refused) message(`${p.name}: ${refused}`); return; }
   passwordProfile=id; $('password-title').textContent=`Connect to ${p.name}`; $('password-account').textContent=`${p.username} at ${p.address}`;
   $('password-error').textContent=refused; $('password-error').hidden=!refused;
   $('open-fullscreen').checked=!!p.fullscreen;
@@ -293,19 +302,26 @@ $('password-form').onsubmit=run(async e=>{
   const p=library.computers.find(x=>x.id===passwordProfile); if(!p) return;
   const fullscreen=$('open-fullscreen').checked;
   const inTab=layout==='full'&&engine==='ironrdp'&&$('open-in-tab').checked;
-  const stamp=new Date().toISOString();
   if(engine==='ironrdp'&&!inTab){
     let launched; try{launched=await invoke('launch_session',{id:p.id,password,fullscreen});}finally{password='';}
     sessions.set(launched.session,{name:p.name,profileId:p.id,state:'Connecting',clipboard:p.clipboard,fullscreen,ended:false,external:true,transport:null});
-    library=await invoke('save_profile',{profile:{...p,lastConnected:stamp}}); renderAll(); return;
+    renderAll(); return;
   }
   let result; try{result=await invoke('connect_session',{id:p.id,password});}finally{password='';}
   sessions.set(result.session,{name:p.name,profileId:p.id,state:'Connecting',clipboard:p.clipboard,fullscreen,ended:false,external:false,transport:null});
-  library=await invoke('save_profile',{profile:{...p,lastConnected:stamp}});
   await openSession(result.session);
 });
 document.querySelectorAll('[data-close]').forEach(e=>e.onclick=()=>{$(e.dataset.close).close();$('password-input').value='';});
 $('password-dialog').addEventListener('close',()=>{$('password-input').value='';$('password-error').hidden=true;});
+
+// "Last opened" means the computer actually answered. Stamping it at launch put a
+// refused sign-in at the top of the Recent list and claimed it had been opened.
+async function stampConnected(session) {
+  if(!session||session.stamped||!session.profileId) return;
+  session.stamped=true;
+  const p=library.computers.find(x=>x.id===session.profileId); if(!p) return;
+  library=await invoke('save_profile',{profile:{...p,lastConnected:new Date().toISOString()}});
+}
 
 // A desktop window that closed by itself. The session publishes why it stopped;
 // without this a mistyped password just closed the window and said nothing.
@@ -314,7 +330,10 @@ function reportSessionEnd(session, ended) {
   const name=session?.name||'The desktop';
   if(!failure){
     // No word from the session at all: it stopped before it could report.
-    if(session&&!ended.status&&session.state!=='Connected') message(`${name} closed before the desktop opened. See the session log.`);
+    if(session&&!ended.status&&session.state!=='Connected'){message(`${name} closed before the desktop opened. See the session log.`);return;}
+    // It reported, but then stopped on a signal or a non-zero exit rather than a
+    // clean close: say so instead of letting the window vanish without a word.
+    if(session&&ended.code!==0) message(`${name} stopped unexpectedly. See the session log.`);
     return;
   }
   const retry=failure.reason==='credentials';
@@ -395,21 +414,22 @@ async function poll() {
   if(!nativeMode||quitting) return;
   try{
     const events=[...deferredEvents,...await invoke('poll_events')]; deferredEvents=[];
+    let changed=false;
     for(const e of events){
       const s=sessions.get(e.session);
       if(e.kind==='certificate'){certificates.push(e);await nextCertificate();continue;}
       if(!s){if(!closedSessions.has(e.session)&&deferredEvents.length<64)deferredEvents.push(e);continue;}
       if(e.kind==='stage'){s.state=e.text;if(connectingId===e.session)$('connecting-stage').textContent=e.text;}
-      if(e.kind==='connected'){s.state='Connected';if(requested===e.session&&!certificate){await openSession(e.session);if(s.fullscreen){s.fullscreen=false;await invoke('window_action',{operation:'fullscreen'});}}}
+      if(e.kind==='connected'){s.state='Connected';await stampConnected(s);changed=true;if(requested===e.session&&!certificate){await openSession(e.session);if(s.fullscreen){s.fullscreen=false;await invoke('window_action',{operation:'fullscreen'});}}}
       if(e.kind==='ended'){s.state=e.text;s.ended=true;if(active===e.session){await action('library');document.body.classList.remove('session-mode');$('session-toolbar').hidden=true;await openSession(e.session);}message(e.text+(e.detail?'\n'+e.detail:''));}
       if(e.kind==='warning')message(e.text);
       if(e.kind==='input-released')message('Remote input released. Click the desktop to capture it again.');
     }
-    let changed=false;
     if(engine==='ironrdp'){const st=await invoke('session_status');
       for(const x of st.ended){const s=sessions.get(x.session);if(!sessions.delete(x.session))continue;closedSessions.add(x.session);changed=true;reportSessionEnd(s,x);}
       for(const x of st.live||[]){const s=sessions.get(x.session);if(!s)continue;
-        const label=x.transport?.label||null;if((s.transport?.label||null)!==label){s.transport=x.transport;s.state=label?'Connected':s.state;changed=true;}}}
+        const label=x.transport?.label||null;if((s.transport?.label||null)!==label){s.transport=x.transport;s.state=label?'Connected':s.state;changed=true;}
+        if(label) await stampConnected(s);}}
     if(changed) renderAll();
   }catch(e){message(e.message||e);}finally{setTimeout(poll,180);}
 }

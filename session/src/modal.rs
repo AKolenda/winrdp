@@ -41,7 +41,7 @@ const BUTTON_BORDER: u32 = 0x00_d1_d1_d1;
 
 pub struct CloseDialog {
     font: Option<FontVec>,
-    /// The computer name, for "Disconnect from novabila?".
+    /// The computer name, for "Disconnect from Office PC?".
     computer: String,
     hover: Option<Choice>,
 }
@@ -75,7 +75,19 @@ impl CloseDialog {
         ]
     }
 
+    /// Whether the window is big enough to draw the panel in.
+    ///
+    /// Paint and hit-testing share this so a window too small to show the dialog
+    /// never enters a modal state it cannot render: the buttons would still be
+    /// live at their unclamped coordinates while nothing was on screen.
+    pub fn fits(size: PhysicalSize<u32>) -> bool {
+        size.width as usize >= WIDTH + 8 && size.height as usize >= BODY_HEIGHT + FOOTER_HEIGHT + 8
+    }
+
     fn hit(size: PhysicalSize<u32>, x: f64, y: f64) -> Option<Choice> {
+        if !Self::fits(size) {
+            return None;
+        }
         let (x, y) = (x.max(0.0) as usize, y.max(0.0) as usize);
         Self::buttons(size)
             .into_iter()
@@ -98,7 +110,7 @@ impl CloseDialog {
     pub fn paint(&self, pixels: &mut [u32], size: PhysicalSize<u32>) {
         let stride = size.width as usize;
         let (w, h) = (size.width as usize, size.height as usize);
-        if w < WIDTH + 8 || h < BODY_HEIGHT + FOOTER_HEIGHT + 8 {
+        if !Self::fits(size) {
             return;
         }
         // Dim the desktop so the dialog reads as modal.
@@ -161,5 +173,54 @@ impl CloseDialog {
             let tx = x0 + (x1 - x0).saturating_sub(tw) / 2;
             draw_text(font, pixels, stride, size, tx, y0, y1 - y0, TEXT_PX, label, ink, choice == Choice::Disconnect);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use winit::dpi::PhysicalSize;
+
+    use super::{Choice, CloseDialog};
+
+    fn size(width: u32, height: u32) -> PhysicalSize<u32> {
+        PhysicalSize::new(width, height)
+    }
+
+    #[test]
+    fn a_window_too_small_to_draw_the_panel_has_no_live_buttons() {
+        let small = size(300, 400);
+        assert!(!CloseDialog::fits(small));
+        let dialog = CloseDialog::new("Office PC".to_owned());
+        // Anywhere in the window, including where the unclamped buttons would be.
+        for (x, y) in [(0.0, 0.0), (150.0, 200.0), (299.0, 399.0)] {
+            assert_eq!(dialog.click(small, x, y), None);
+        }
+    }
+
+    #[test]
+    fn both_buttons_answer_where_they_are_drawn() {
+        let full = size(1280, 720);
+        assert!(CloseDialog::fits(full));
+        let dialog = CloseDialog::new("Office PC".to_owned());
+        let mut seen = Vec::new();
+        for (choice, x0, y0, x1, y1) in CloseDialog::buttons(full) {
+            let (cx, cy) = (((x0 + x1) / 2) as f64, ((y0 + y1) / 2) as f64);
+            assert_eq!(dialog.click(full, cx, cy), Some(choice));
+            // Just outside is not a hit.
+            assert_eq!(dialog.click(full, (x1 + 1) as f64, cy), None);
+            seen.push(choice);
+        }
+        assert!(seen.contains(&Choice::Disconnect) && seen.contains(&Choice::Cancel));
+    }
+
+    #[test]
+    fn hovering_a_button_asks_for_one_repaint_not_one_per_motion() {
+        let full = size(1280, 720);
+        let mut dialog = CloseDialog::new("Office PC".to_owned());
+        let (_, x0, y0, x1, y1) = CloseDialog::buttons(full)[0];
+        let (cx, cy) = (((x0 + x1) / 2) as f64, ((y0 + y1) / 2) as f64);
+        assert!(dialog.pointer_moved(full, cx, cy), "entering the button repaints");
+        assert!(!dialog.pointer_moved(full, cx + 1.0, cy), "staying on it does not");
+        assert!(dialog.pointer_moved(full, 1.0, 1.0), "leaving it repaints");
     }
 }

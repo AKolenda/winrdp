@@ -110,8 +110,8 @@ fn launch_session(window: WebviewWindow, app: tauri::AppHandle, id: String, pass
         // session falls back to TCP by itself when the UDP bootstrap fails.
         .env("IRONRDP_UDP", if std::env::var("WINRDP_UDP").map(|v| v == "0").unwrap_or(false) { "0" } else { "1" })
         .env("IRONRDP_UDP_OFFER", std::env::var("WINRDP_UDP_OFFER").unwrap_or_else(|_| "2".into()))
-        // Graphics pipeline (EGFX) advertisement; WINRDP_EGFX=1 to evaluate. Off until verified.
-        // The graphics pipeline renders (H.264-less) and is the fast path; on by default.
+        // The graphics pipeline (EGFX) is the fast path and is on by default;
+        // WINRDP_EGFX=0 forces the legacy bitmap path.
         .env("IRONRDP_EGFX", if std::env::var("WINRDP_EGFX").map(|v| v == "0").unwrap_or(false) { "0" } else { "1" })
         .env("WINRDP_TITLE", &profile.name)
         // The session publishes its transport (TCP / UDP v1-3) here; the tab shows it.
@@ -181,7 +181,11 @@ struct Preferences {
     #[allow(dead_code)]
     open_settings: bool,
     #[serde(default = "layout_simple")] layout: String,
-    #[serde(default)] host_checked: bool,
+    /// Retired: recorded whether the host side had been checked once, and nothing
+    /// ever read it back. Accepted so older libraries still load, and dropped on save.
+    #[serde(default, skip_serializing)]
+    #[allow(dead_code)]
+    host_checked: bool,
 }
 fn layout_simple() -> String { "simple".into() }
 #[derive(Clone, Serialize, Deserialize)]
@@ -228,7 +232,7 @@ async fn bootstrap(window: WebviewWindow, app: tauri::AppHandle) -> Result<Value
     trusted(&window)?;
     let library = { let store = app.state::<Store>(); let _guard = store.lock.lock().map_err(|_| "Library lock failed")?; store.load()? };
     let info = native(&window, "info", json!({}), None).await?;
-    Ok(json!({"library": library, "native": info, "version": "0.7.6", "engine": engine(),
+    Ok(json!({"library": library, "native": info, "version": env!("CARGO_PKG_VERSION"), "engine": engine(),
         "user": std::env::var("USER").unwrap_or_default()}))
 }
 #[tauri::command]
@@ -265,7 +269,9 @@ async fn connect_session(window: WebviewWindow, app: tauri::AppHandle, id: Strin
 }
 #[tauri::command]
 async fn session_action(window: WebviewWindow, operation: String, payload: Value) -> Result<Value, String> {
-    if !matches!(operation.as_str(), "select" | "library" | "disconnect" | "certificate" | "clipboard" | "release" | "cad") {
+    // "release" (release every held key) was never reachable from the UI; the classic
+    // engine releases held keys itself on focus loss. Nothing may call it from here.
+    if !matches!(operation.as_str(), "select" | "library" | "disconnect" | "certificate" | "clipboard" | "cad") {
         return Err("Unsupported session action.".into());
     }
     if payload.to_string().len() > 8192 { return Err("Request is too large.".into()); }
@@ -356,6 +362,11 @@ fn host_enable(window: WebviewWindow, username: String, password: String, mode: 
     let share_mode = match mode.as_str() { "extend" => "extend", _ => "mirror-primary" };
     if !username.trim().is_empty() {
         if password.is_empty() || password.len() > 512 || password.contains('\0') { return Err("Enter a sharing password.".into()); }
+        // `grdctl rdp set-credentials` takes the password as a positional argument and
+        // offers no stdin or file alternative, so it is readable in /proc/<pid>/cmdline
+        // for as long as that one call runs. sh() still never involves a shell, so the
+        // value cannot leak into a history file or a child's environment, and the
+        // command line is never echoed back into an error message.
         sh("grdctl", &["rdp", "set-credentials", username.trim(), &password])?;
     }
     let _ = sh("systemctl", &["--user", "disable", "--now", "gnome-remote-desktop-headless.service"]);
@@ -400,8 +411,8 @@ async fn quit(window: WebviewWindow, app: tauri::AppHandle) -> Result<(), String
     Err("A connection is still shutting down. Wait a moment, then close again.".into())
 }
 fn main() {
-    if std::env::args().any(|a| a == "--version") { println!("Win RDP 0.7.6"); return; }
-    // This recovery build establishes a software baseline, not an experimental GPU release.
+    if std::env::args().any(|a| a == "--version") { println!("Win RDP {}", env!("CARGO_PKG_VERSION")); return; }
+    // Decode in software: the hardware decoders are not part of what this build ships.
     std::env::set_var("WINRDP_HWDECODER", "software");
     tauri::Builder::default()
         .setup(|app| {

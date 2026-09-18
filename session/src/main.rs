@@ -16,17 +16,39 @@ use tracing::debug;
 use winit::dpi::PhysicalSize;
 use winit::event_loop::EventLoop;
 
-fn main() -> anyhow::Result<()> {
-    let cli = ViewerConfig::parse_args().context("CLI arguments parsing")?;
+/// Report a failure that happened before there was a session window, then exit.
+///
+/// The launcher only ever sees the status file and the log, so an error that
+/// stops here has to be published rather than returned: otherwise the window
+/// never appears and the launcher can only say the session "closed before the
+/// desktop opened" and point at an empty log.
+fn startup_failed(error: &anyhow::Error) -> ! {
+    eprintln!("Error: {error:#}");
+    let code = winrdp_session::app::report_startup_failure(error);
+    proc_exit::Code::from(code).process_exit()
+}
 
-    setup_logging(cli.log_file()).context("unable to initialize logging")?;
+/// `?` for the startup path: publish the failure instead of returning it.
+macro_rules! starting {
+    ($result:expr) => {
+        match $result {
+            Ok(value) => value,
+            Err(error) => startup_failed(&anyhow::Error::from(error)),
+        }
+    };
+}
+
+fn main() -> anyhow::Result<()> {
+    let cli = starting!(ViewerConfig::parse_args().context("CLI arguments parsing"));
+
+    starting!(setup_logging(cli.log_file()).context("unable to initialize logging"));
 
     if cli.rpc_mode() {
         return run_rpc(cli).context("RPC server");
     }
 
     let dump_rdp = cli.dump_rdp().map(ToOwned::to_owned);
-    let config = cli.into_config().context("configuration")?;
+    let config = starting!(cli.into_config().context("configuration"));
 
     if let Some(dump_path) = dump_rdp {
         // Dump the effective, secret-stripped PropertySet observed from the built configuration.
@@ -36,7 +58,7 @@ fn main() -> anyhow::Result<()> {
     }
 
     debug!("Initialize App");
-    let event_loop = EventLoop::<RdpOutputEvent>::with_user_event().build()?;
+    let event_loop = starting!(EventLoop::<RdpOutputEvent>::with_user_event().build());
     let event_loop_proxy = event_loop.create_proxy();
     let (output_event_sender, mut output_event_receiver) = output_channel(64);
     let initial_window_size = PhysicalSize::new(
@@ -53,13 +75,16 @@ fn main() -> anyhow::Result<()> {
     let client = attach_linux_rdpdr_backend(client);
     let input_event_sender = client.input_sender();
 
-    let mut app =
-        App::new(&event_loop, &input_event_sender, initial_window_size).context("unable to initialize App")?;
+    let mut app = starting!(
+        App::new(&event_loop, &input_event_sender, initial_window_size).context("unable to initialize App")
+    );
 
-    let rt = runtime::Builder::new_multi_thread()
-        .enable_all()
-        .build()
-        .context("unable to create tokio runtime")?;
+    let rt = starting!(
+        runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .context("unable to create tokio runtime")
+    );
 
     // Forward output events from the library's output channel to winit's `EventLoopProxy`.
     //

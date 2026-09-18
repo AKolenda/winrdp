@@ -1,34 +1,59 @@
-# Source provenance and recovery boundary
+# Source provenance
 
-The preceding conversation linked `Win-RDP-Tauri-source.zip` despite failed
-file-creation calls. There was no such ZIP in the mounted conversation files.
-No Tauri Cargo.toml, tauri.conf.json, Rust source or native migration bridge was
-preserved there. Screenshots of the 0.6 design and a 147-byte packaging report
-were present; neither is source code or proof of a package build.
+Where the code in this repository came from, so that a reader can tell written
+work from recovered work from vendored third-party work.
 
-This 0.6.1 recovery preview is **newly assembled**, not a rediscovery of the
-missing 0.6 implementation and not evidence that prior native claims were tested.
+## This repository
 
-Recovered unchanged from `/usr/share/velordp/source` inside the attached
-`win-rdp_0.4.0_all.deb`:
+An independent source snapshot. Its Git history starts with the first public
+release and is not a copy or a rewrite of the private repository the project was
+developed in. Internal development notes and captures of private desktops are not
+part of it.
 
-- engine/src/*.cpp and *.hpp (only core, profile and rdp_session enter this new build)
-- core_tests.cpp and geometry_tests.cpp
-- LICENSE and the original monitor SVG
+## The RDP session window
 
-Newly written in this pass:
+`session/` is `winrdp-session`, this project's build of IronRDP's own viewer. It is
+derived from `crates/ironrdp-viewer` in the vendored fork and keeps that code's
+Apache-2.0/MIT licensing; the connection-failure reporting, the transport status
+file, the full-screen connection bar (`bar.rs`), the disconnect dialog (`modal.rs`)
+and the resize handling are this project's work.
 
-- native/bridge.cpp and bridge.h: GTK native surface and C ABI
-- native/CMakeLists.txt
-- src-tauri: Rust commands, persistence and Tauri application
-- frontend/index.html, app.css and app.js
-- scripts/preflight.py, build-deb.sh, install-build-deps.sh and package-binary.py
-- packaging metadata, instructions and recovery tests
+## The RDP engine
 
-Preserved historical material:
+`third_party/ironrdp/` is a Git submodule pinned to a revision of
+[AKolenda/ironrdp-winrdp](https://github.com/AKolenda/ironrdp-winrdp), a fork of
+[Devolutions/IronRDP](https://github.com/Devolutions/IronRDP). The fork carries the
+MS-RDPEUDP transport, graphics over the reliable UDP tunnel, and the Linux
+clipboard, printer and audio backends. The MS-RDPEUDP version 1/2 reliable data
+transfer was contributed back and merged upstream as
+[Devolutions/IronRDP#1919](https://github.com/Devolutions/IronRDP/pull/1919).
+Upstream's licence files ship with the package as `IronRDP-LICENSE-MIT` and
+`IronRDP-LICENSE-APACHE`.
 
-- website/*.html from the available winrdp-050 previews. The latest website
-  variants and complete Next.js website source were not recoverable.
+## The classic engine
 
-These distinctions are intentional. New bridge code is uncompiled in the
-current authoring environment. Historical engine tests do not validate it.
+`engine/` is the Qt/FreeRDP client that predates the IronRDP work and still drives
+in-tab sessions. Its core, profile and session sources were recovered unchanged
+from `/usr/share/velordp/source` inside the `win-rdp_0.4.0_all.deb` package, along
+with `tests/core_tests.cpp`, `tests/geometry_tests.cpp` and the original monitor
+SVG. `native/` is the GTK bridge and C ABI between that engine and the launcher
+shell, written for this project.
+
+## The launcher
+
+`src-tauri/` (the Tauri shell and its commands), `frontend/` (plain HTML, CSS and
+JavaScript, no framework), `scripts/`, `packaging/` and `website/` are this
+project's work.
+
+## Third-party notices
+
+`docs/THIRD-PARTY.md` records the bundled Qt and FreeRDP runtime with its source
+archives and local patches. `docs/rust-dependency-notices.json` inventories every
+Rust dependency with its registry checksum and source URL, and
+`docs/licenses/rust/` holds their licence texts. `tests/notice_checks.py` verifies
+that the inventory and the texts on disk agree.
+
+## Licence
+
+The project is AGPL-3.0-only; see `LICENSE`. Vendored and recovered code keeps the
+licence it came with.

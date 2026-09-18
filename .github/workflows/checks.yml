@@ -17,6 +17,58 @@ jobs:
         run: |
           python3 tests/recovery_tests.py
           python3 tests/command_error_checks.py
+          python3 tests/notice_checks.py
           node --check frontend/app.js
+          node website/build.mjs
           python3 scripts/check-release.py
           python3 -m py_compile scripts/*.py
+      - name: Check packaging metadata against the freedesktop validators
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y appstream desktop-file-utils
+          appstreamcli validate packaging/io.winrdp.Next.metainfo.xml
+          desktop-file-validate packaging/io.winrdp.Next.desktop
+
+  # The session crate carries the connection-failure classification, the status
+  # file the launcher reads and the window's own logic. None of it was compiled
+  # by any workflow before, so a break reached master and a release tag unnoticed.
+  session:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: session
+      - name: Install session build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev libwayland-dev libxkbcommon-dev \
+            libxkbcommon-x11-dev libxcb1-dev pkg-config
+      - name: Test
+        run: cargo test --manifest-path session/Cargo.toml --locked --lib
+      - name: Lint
+        run: cargo clippy --manifest-path session/Cargo.toml --locked --lib --tests -- -D warnings
+
+  # The classic engine's core and geometry tests, which likewise ran nowhere.
+  native:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Install native build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build
+      - name: Build and test the engine core
+        run: |
+          cmake -S native -B build/native -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_TESTING=ON -DWINRDP_CORE_ONLY=ON
+          cmake --build build/native
+          ctest --test-dir build/native --output-on-failure --timeout 90

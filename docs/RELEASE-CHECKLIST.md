@@ -2,13 +2,15 @@
 
 ## Source publication
 
-- Review all published branch and tag history for credentials and private workstation data.
-  A credential was found in historical development notes during this review. Sanitize
-  the affected history before making the repository public, and rotate that credential.
-  Do not publish local application checkpoint refs or use `git push --mirror`.
+- Review all published branch and tag history for credentials and private workstation
+  data before it is pushed. Do not publish local application checkpoint refs and do not
+  use `git push --mirror`.
+- Grep anything about to be published for test-host names, LAN addresses and local user
+  names; screenshots and doc comments are the usual carriers.
 - Make the IronRDP fork revision available before publishing an app revision that refers to it.
 - Confirm screenshots show demonstration profiles and contain no private desktop content.
-- Run `python3 tests/recovery_tests.py` and `python3 scripts/check-release.py`.
+- Run `python3 tests/recovery_tests.py`, `python3 tests/notice_checks.py` and
+  `python3 scripts/check-release.py`.
 
 ## Binary validation
 
@@ -27,7 +29,7 @@
 
 ## GitHub release
 
-- Keep version fields synchronized; `scripts/check-release.py --tag v0.7.6` validates them.
+- Keep version fields synchronized; `scripts/check-release.py --tag v0.7.7` validates them.
 - Create and push the release tag only after the desired source is committed in both repos.
 - Run the manual **Prepare draft release** workflow against that tag. It creates a draft
   and never publishes it automatically.

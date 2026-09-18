@@ -4,6 +4,8 @@
  */
 import fs from 'node:fs';
 import assert from 'node:assert/strict';
+import process from 'node:process';
+import {pathToFileURL} from 'node:url';
 const root=new URL('../',import.meta.url);
 export async function run({context,log=async()=>[]}) {
   const checks=[];
@@ -31,7 +33,7 @@ export async function run({context,log=async()=>[]}) {
       }
       if(command==='save_preferences'){window.testLibrary.preferences=args.preferences;return structuredClone(window.testLibrary);}
       if(command==='poll_events')return window.events.splice(0);
-      if(command==='session_status')return {ended:[],live:[]};
+      if(command==='session_status')return {ended:(window.endedSessions||[]).splice(0),live:(window.liveSessions||[])};
       if(command==='host_status')return {available:true,sharing:false,credentials:true};
       if(command==='launch_session')return {session:'mock-session'};
       return {ok:true};
@@ -72,6 +74,27 @@ export async function run({context,log=async()=>[]}) {
   await page.locator('#password-form').getByRole('button',{name:'Connect',exact:true}).click();await logs();
   check('password field cleared after launch',await page.locator('#password-input').inputValue()==='');
   check('correct profile launches',await page.evaluate(id=>window.calls.some(c=>c.command==='launch_session'&&c.id===id),saved.id));
+  check('launching alone does not stamp the computer as opened',
+    await page.evaluate(id=>!window.testLibrary.computers.find(x=>x.id===id).lastConnected,saved.id));
+  // The session publishes its transport once the computer answers.
+  await page.evaluate(()=>{window.liveSessions=[{session:'mock-session',transport:{transport:'udp',udpVersion:2,label:'UDP v2'}}];});
+  await page.waitForFunction(id=>!!window.testLibrary.computers.find(x=>x.id===id).lastConnected,saved.id);
+  check('a connected session stamps the computer as opened',true);
+  // A refused sign-in: the session exits and publishes why.
+  await page.evaluate(()=>{window.liveSessions=[];window.endedSessions=[{session:'mock-session',code:76,
+    status:{state:'failed',reason:'credentials',message:'The user name or password is incorrect.',detail:'CredSSP: LOGON_FAILURE'}}];});
+  await page.locator('#password-dialog[open]').waitFor();
+  check('a refused sign-in reopens the password dialog',await page.locator('#password-title').innerText()==='Connect to 192.0.2.30');
+  check('the dialog says why the sign-in was refused',
+    await page.locator('#password-error').innerText()==='The user name or password is incorrect.');
+  check('the reopened dialog starts empty',await page.locator('#password-input').inputValue()==='');
+  // A second refusal while that dialog is open must not re-point it at another computer.
+  await page.evaluate(()=>{window.endedSessions=[{session:'other-session',code:76,
+    status:{state:'failed',reason:'credentials',message:'The user name or password is incorrect.',detail:''}}];});
+  await page.waitForTimeout(400);
+  check('a refusal for another session does not re-point the open dialog',
+    await page.locator('#password-title').innerText()==='Connect to 192.0.2.30');
+  await page.locator('#password-dialog').getByRole('button',{name:'Cancel',exact:true}).click();await logs();
   await box.fill('Office PC');await logs();
   check('typing saved name restores its clipboard setting',await page.locator('#opt-clipboard').isChecked());
   await box.fill('');await logs();
@@ -95,4 +118,24 @@ export async function run({context,log=async()=>[]}) {
   check('no JavaScript errors',errors.length===0);
   await page.close();
   return {checks_passed:checks.length,checks,scope:'Current launcher in Chromium, mocked native commands; no RDP connection'};
+}
+
+// These checks need a browser. Run directly, they execute nothing, so exit
+// non-zero rather than let an empty run read as a pass; with Playwright
+// installed, drive Chromium here so CI can run them unattended.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  let chromium;
+  try { ({chromium} = await import('playwright')); } catch { chromium = null; }
+  if (!chromium) {
+    console.error('launcher_checks.mjs needs a browser context. Install Playwright (npm i -D playwright && npx playwright install chromium)');
+    console.error('or call run({context}) from an existing session; see the header comment.');
+    process.exit(2);
+  }
+  const browser = await chromium.launch();
+  try {
+    const result = await run({context: await browser.newContext()});
+    console.log(`${result.checks_passed} launcher checks passed`);
+  } finally {
+    await browser.close();
+  }
 }

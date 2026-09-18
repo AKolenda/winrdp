@@ -1,8 +1,8 @@
 [Desktop Entry]
 Type=Application
-Name=Win RDP Next
+Name=Win RDP
 GenericName=Remote Desktop
-Comment=Experimental Tauri migration of Win RDP
+Comment=Connect to Windows computers over Remote Desktop
 Exec=winrdp-next
 Icon=winrdp-next
 Terminal=false
