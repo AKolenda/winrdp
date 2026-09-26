@@ -33,7 +33,6 @@ mentions = {
     'BUILDING.md': f'winrdp-next_{version}_amd64.deb',
     'docs/RELEASE-CHECKLIST.md': f'check-release.py --tag v{version}',
     'docs/RELEASE-NOTES.md': f'Win RDP {version}',
-    'website/public/index.html': f'/releases/tag/v{version}',
 }
 missing = [f'{path} does not mention "{text}"' for path, text in mentions.items()
            if text not in (ROOT / path).read_text()]

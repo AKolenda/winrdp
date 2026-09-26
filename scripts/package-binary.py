@@ -121,7 +121,9 @@ def package(binary, runtime, output, session=None):
         desktop=(ROOT/'packaging/io.winrdp.Next.desktop').read_text()
         write(stage/'usr/share/applications/io.winrdp.Next.desktop',desktop)
         icon=stage/'usr/share/icons/hicolor/scalable/apps/winrdp-next.svg';icon.parent.mkdir(parents=True);shutil.copy2(ROOT/'frontend/assets/winrdp.svg',icon)
-        icon=stage/'usr/share/icons/hicolor/256x256/apps/winrdp-next.png';icon.parent.mkdir(parents=True);shutil.copy2(ROOT/'src-tauri/icons/icon.png',icon)
+        # Fixed sizes win over scalable; 16-32 px are drawn on the pixel grid (docs/branding/build.py).
+        for png in sorted((ROOT/'packaging/icons').glob('*.png')):
+            icon=stage/f'usr/share/icons/hicolor/{png.stem}x{png.stem}/apps/winrdp-next.png';icon.parent.mkdir(parents=True);shutil.copy2(png,icon)
         write(stage/'usr/share/metainfo/io.winrdp.Next.metainfo.xml',(ROOT/'packaging/io.winrdp.Next.metainfo.xml').read_text())
         docs=stage/'usr/share/doc/winrdp-next';docs.mkdir(parents=True)
         for filename in ('README.md','BUILDING.md','LICENSE','PROVENANCE.md'):shutil.copy2(ROOT/filename,docs/filename)

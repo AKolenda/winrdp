@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16">
+  <!-- Pixel-aligned master for 16 px: flat ends on whole rows -->
+  <path d="M4.25 12h2.5l2.5-6h-2.5zM9.25 12h2.5l2.5-9h-2.5z" fill="#0f766e"/>
+  <path d="M1.75 3h2.5l2.5 9h-2.5zM6.75 6h2.5l2.5 6h-2.5z" fill="#2dd4bf"/>
+</svg>
