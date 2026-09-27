@@ -20,7 +20,9 @@ jobs:
       - name: Prepare an unprivileged build user
         run: |
           apt-get update
-          DEBIAN_FRONTEND=noninteractive apt-get install --yes --no-install-recommends git sudo curl ca-certificates
+          # BUILDING.md's prerequisites: a C toolchain for rustup's Rust to link with, and git.
+          DEBIAN_FRONTEND=noninteractive apt-get install --yes --no-install-recommends \
+            build-essential git sudo curl ca-certificates
           useradd --create-home builder
           # xtask refuses to build as root and runs apt through sudo, as on a desktop.
           printf 'Defaults env_keep += "DEBIAN_FRONTEND"\nbuilder ALL=(root) NOPASSWD: /usr/bin/apt-get\n' > /etc/sudoers.d/builder
