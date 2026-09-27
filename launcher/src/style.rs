@@ -119,6 +119,8 @@ pub struct Icons {
     pub minimize: svg::Handle,
     pub maximize: svg::Handle,
     pub close: svg::Handle,
+    pub expand: svg::Handle,
+    pub compact: svg::Handle,
     pub tab_close: svg::Handle,
     pub chevron_down: svg::Handle,
     pub chevron_right: svg::Handle,
@@ -134,6 +136,9 @@ pub static ICONS: LazyLock<Icons> = LazyLock::new(|| {
     minimize: stroke_icon(16, r#"<path d="M3 8h10"/>"#),
     maximize: stroke_icon(16, r#"<rect x="3.5" y="3.5" width="9" height="9"/>"#),
     close: stroke_icon(16, r#"<path d="m4 4 8 8m0-8-8 8"/>"#),
+    // Arrows out to the corners: switch to the full window. Arrows in: back to the simple one.
+    expand: stroke_icon(16, r#"<path d="M9.5 2.5h4v4m0-4L9 7M6.5 13.5h-4v-4m0 4L7 9"/>"#),
+    compact: stroke_icon(16, r#"<path d="M13.5 2.5 9 7m0-3.5V7h3.5M2.5 13.5 7 9m0 3.5V9H3.5"/>"#),
     tab_close: stroke_icon(16, r#"<path d="m4.6 4.6 6.8 6.8m0-6.8-6.8 6.8"/>"#),
     chevron_down: stroke_icon(16, r#"<path d="m4 6 4 4 4-4"/>"#),
     chevron_right: stroke_icon(16, r#"<path d="m6 4 4 4-4 4"/>"#),

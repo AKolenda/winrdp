@@ -184,6 +184,16 @@ impl Launcher {
             "the title bar's close button is expected in the top-right corner"
         );
     }
+    /// The arrows button left of the title bar's other buttons: beside Settings in the
+    /// simple window, beside Minimize in the full one.
+    fn toggle_layout(&mut self) {
+        let width = window_size(self.app.layout).1.width;
+        let messages = self.act(|ui| press(ui, Point::new(width - 154.0, 20.0)));
+        assert!(
+            messages.iter().any(|m| matches!(m, Message::SetLayout(_))),
+            "the layout button is expected left of the title bar's other buttons"
+        );
+    }
     /// Replaces the text of a field, as selecting all and typing does.
     fn type_into(&mut self, field: &'static str, text: &str) {
         self.dismiss_suggestions();
@@ -792,6 +802,19 @@ fn closing_the_window_with_nothing_open_does_not_ask() {
     let mut launcher = Launcher::simple();
     launcher.close_window();
     assert!(launcher.app.dialogs.is_empty());
+}
+
+#[test]
+fn the_title_bar_switches_between_the_simple_and_full_windows() {
+    let mut launcher = Launcher::simple();
+    launcher.toggle_layout();
+    assert_eq!(launcher.app.layout, Layout::Full);
+    assert_eq!(launcher.demo.borrow().library.preferences.layout, Layout::Full);
+    assert!(launcher.shows("Favourites"), "the window changed to the full layout");
+
+    launcher.toggle_layout();
+    assert_eq!(launcher.app.layout, Layout::Simple);
+    assert_eq!(launcher.demo.borrow().library.preferences.layout, Layout::Simple);
 }
 
 // ---------- settings ----------

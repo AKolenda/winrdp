@@ -191,19 +191,19 @@ impl App {
         self.resync();
         Ok(())
     }
-    /// Sizes the window for a layout: the simple window is a small dialog, the full one a workspace.
+    /// Moves the launcher into the layout's window: the simple window is a small dialog, the
+    /// full one a workspace. Each layout gets a new window rather than a resize: on Wayland,
+    /// winit applies a requested size without reporting it, so iced keeps drawing the old size.
     pub fn apply_layout(&mut self, layout: Layout) -> Task<Message> {
         self.layout = layout;
         self.combo_open = false;
         self.resync();
-        let Some(id) = self.window else { return Task::none() };
-        let (min, size) = window_size(layout);
-        Task::batch([
-            window::set_resizable(id, layout == Layout::Full),
-            window::set_min_size(id, Some(min)),
-            window::maximize(id, false),
-            window::resize(id, size),
-        ])
+        let Some(old) = self.window else { return Task::none() };
+        let (_, opened) = window::open(window_settings(layout));
+        // The old window closes once the new one is open; closing the last window exits the app.
+        opened
+            .map(|id| Message::WindowOpened(Some(id)))
+            .chain(window::close(old))
     }
     fn refresh_host(&mut self) -> Task<Message> {
         self.host.busy = true;
@@ -593,4 +593,36 @@ pub fn window_size(layout: Layout) -> (Size, Size) {
         Layout::Simple => (Size::new(460.0, 420.0), Size::new(480.0, 600.0)),
         Layout::Full => (Size::new(780.0, 540.0), Size::new(1240.0, 820.0)),
     }
+}
+
+/// The launcher window for a layout, opened at startup and again on every layout change.
+pub fn window_settings(layout: Layout) -> window::Settings {
+    let (min, size) = window_size(layout);
+    window::Settings {
+        size,
+        min_size: Some(min),
+        position: window::Position::Centered,
+        resizable: layout == Layout::Full,
+        decorations: !crate::view::undecorated(),
+        exit_on_close_request: false,
+        icon: window_icon(),
+        // Matches StartupWMClass in io.winrdp.Next.desktop, so the dock shows the app icon.
+        platform_specific: window::settings::PlatformSpecific {
+            application_id: "winrdp-next".into(),
+            ..Default::default()
+        },
+        ..window::Settings::default()
+    }
+}
+
+/// The app icon, for window managers that read it from the window (X11 `_NET_WM_ICON`).
+fn window_icon() -> Option<window::Icon> {
+    let decoder = png::Decoder::new(std::io::Cursor::new(
+        include_bytes!("../../packaging/icons/64.png").as_slice(),
+    ));
+    let mut reader = decoder.read_info().ok()?;
+    let mut rgba = vec![0; reader.output_buffer_size()?];
+    let frame = reader.next_frame(&mut rgba).ok()?;
+    rgba.truncate(frame.buffer_size());
+    window::icon::from_rgba(rgba, frame.width, frame.height).ok()
 }

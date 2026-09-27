@@ -6,7 +6,7 @@ use iced::widget::{Column, Space, button, column, container, hover, mouse_area, 
 use iced::{Color, Fill, Padding, padding};
 
 use crate::app::{App, COMPUTER_BOX, Message, Session, looks_like_address};
-use crate::library::Profile;
+use crate::library::{Layout, Profile};
 use crate::style::{self, ICONS, Tokens, bold, icon};
 
 use super::Element;
@@ -19,6 +19,7 @@ pub(super) fn view(app: &App, t: Tokens) -> Element<'_> {
         Space::new().width(8),
         label("Win RDP", 12.0, t.ink),
         mouse_area(Space::new().width(Fill).height(Fill)).on_press(Message::Drag),
+        caption_button(t, &ICONS.expand, Message::SetLayout(Layout::Full), false),
         caption_button(t, &ICONS.gear, Message::OpenSettings, false),
         caption_button(t, &ICONS.minimize, Message::Minimize, false),
         caption_button(t, &ICONS.close, Message::CloseRequested, true),

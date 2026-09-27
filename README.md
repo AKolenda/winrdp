@@ -63,7 +63,8 @@ already passes `WINRDP_UDP_OFFER=2`, so installed sessions are unaffected.
 ## The launcher
 
 A native Rust window built with [iced](https://iced.rs): no webview, no JavaScript.
-Two layouts, chosen in Settings.
+Two layouts. The arrows button at the top right switches between them, and so does
+Settings.
 
 **Simple** is the default: one small window, the way the Windows client is. Pick a
 computer or type an address, press Enter. Every desktop opens in its own window.

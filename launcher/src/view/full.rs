@@ -6,7 +6,7 @@ use iced::widget::{Column, Row, Space, button, column, container, hover, mouse_a
 use iced::{Fill, Length, Padding, Shrink, padding};
 
 use crate::app::{App, FILTER, Message, Page, Session, SessionState, relative_date};
-use crate::library::Profile;
+use crate::library::{Layout, Profile};
 use crate::style::{self, ICONS, Tokens, bold, icon};
 
 use super::widgets::{caption_button, hrule, label, line, pill, scroll, strong, vrule};
@@ -24,6 +24,7 @@ pub(super) fn view(app: &App, t: Tokens) -> Element<'_> {
         mouse_area(Space::new().width(Fill).height(Fill))
             .on_press(Message::Drag)
             .on_double_click(Message::ToggleMaximize),
+        caption_button(t, &ICONS.compact, Message::SetLayout(Layout::Simple), false),
         caption_button(t, &ICONS.minimize, Message::Minimize, false),
         caption_button(t, &ICONS.maximize, Message::ToggleMaximize, false),
         caption_button(t, &ICONS.close, Message::CloseRequested, true),

@@ -20,7 +20,6 @@ mod view;
 use iced::{Task, window};
 
 use crate::app::{App, Message};
-use crate::library::Layout;
 
 fn main() -> iced::Result {
     if std::env::args().any(|a| a == "--version") {
@@ -28,7 +27,6 @@ fn main() -> iced::Result {
         return Ok(());
     }
     let layout = backend::Store::layout_hint();
-    let (min, size) = app::window_size(layout);
     iced::application(boot, App::update, view::view)
         .title(App::title)
         .theme(|app: &App| app.tokens().theme())
@@ -39,21 +37,7 @@ fn main() -> iced::Result {
             default_text_size: 13.into(),
             ..iced::Settings::default()
         })
-        .window(window::Settings {
-            size,
-            min_size: Some(min),
-            resizable: layout == Layout::Full,
-            decorations: !view::undecorated(),
-            exit_on_close_request: false,
-            icon: window_icon(),
-            // Matches StartupWMClass in io.winrdp.Next.desktop, so the dock shows the app icon.
-            platform_specific: window::settings::PlatformSpecific {
-                application_id: "winrdp-next".into(),
-                ..Default::default()
-            },
-            ..window::Settings::default()
-        })
-        .centered()
+        .window(app::window_settings(layout))
         .run()
 }
 
@@ -62,16 +46,4 @@ fn boot() -> (App, Task<Message>) {
     let opened = window::oldest().map(Message::WindowOpened);
     let notice = error.map_or_else(Task::none, |e| app.update(Message::Notify(e)));
     (app, Task::batch([opened, notice]))
-}
-
-/// The app icon, for window managers that read it from the window (X11 `_NET_WM_ICON`).
-fn window_icon() -> Option<window::Icon> {
-    let decoder = png::Decoder::new(std::io::Cursor::new(
-        include_bytes!("../../packaging/icons/64.png").as_slice(),
-    ));
-    let mut reader = decoder.read_info().ok()?;
-    let mut rgba = vec![0; reader.output_buffer_size()?];
-    let frame = reader.next_frame(&mut rgba).ok()?;
-    rgba.truncate(frame.buffer_size());
-    window::icon::from_rgba(rgba, frame.width, frame.height).ok()
 }
