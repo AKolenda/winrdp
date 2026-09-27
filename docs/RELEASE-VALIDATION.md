@@ -161,3 +161,20 @@ resolves to published release 0.7.7; the 0.8.0 package above was built locally.
 Cloudflare injects an analytics beacon that the site's existing CSP blocks,
 producing one console warning and one blocked request per page load. Page assets
 and navigation work. Neither the CSP nor analytics settings were changed.
+
+### Native Wayland check — 2026-09-27
+
+The tagged 0.8.0 package (`07026073bc4516fcb110384a432be2fea13d59dc247c73388f2ab2cc049926c5`)
+was extracted and run as native Wayland clients, with no X11 display, under a nested
+Weston 13 compositor using its software (pixman) renderer. The launcher drew both
+layouts' simple window and its dialogs. It started the packaged session, which
+connected over TCP to the fork's example server, presented frames through `wl_shm`
+with client-side decorations, reported `TCP`, and stamped "last opened". Closing the
+session window ended it cleanly. A copy of a library written by 0.7.4 (five computers,
+dark appearance, the retired `openSettings` preference) loaded unchanged. The server
+does not complete dynamic resizing, so the Wayland window's first resize fell back to
+reconnecting after 10 s, as on X11. Clipboard redirection was off: Weston offers no
+data-control protocol and no X11 fallback there.
+
+Not covered: GNOME Shell's own Wayland compositor, and any Windows host. This build
+has not yet been connected to a Windows computer.
