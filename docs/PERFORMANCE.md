@@ -5,20 +5,29 @@ RAM and Zorin OS 18.1 (GNOME).
 
 ## On a real Windows PC
 
-A Windows 11 PC on the same local network, connected the way the launcher connects.
+A Windows 11 PC on the same local network. Win RDP and Remmina were run one after the
+other with the same window drag.
 
-| | |
-|---|---|
-| Connect and sign in | 0.36 s |
-| First picture of the desktop | within 2.4 s |
-| Resize the window larger (1280×720 to 1660×840) | Windows redraws at the new size 0.35 s after you let go; the picture is complete by 0.65 s |
-| Resize the window smaller (1660×840 to 960×460) | Windows redraws at the new size 0.21 s after you let go |
-| Press a key, see the result | about 80 ms (54 to 89 ms over 5 tries) |
+| | Win RDP 0.8.0 | Remmina 1.4.43 |
+|---|---|---|
+| Resize larger: Windows switches to the new size after you let go | 0.20 s | 0.49 s |
+| Resize smaller: Windows switches to the new size after you let go | 0.21 s | 0.55 s |
+| Resize larger: window fully redrawn | 0.75 s | 1.13 s |
+| Press Escape: Start menu starts closing | 84 ms | 92 ms |
+| Press the Windows key: Start menu starts opening | 252 ms | 189 ms |
 
-The key test pressed Escape to close the Start menu and timed the first change on screen.
-Opening the Start menu takes about 250 ms, most of it Windows deciding to show the menu.
+Win RDP resizes about 2.5 times faster. Remmina appears to wait about half a second after
+you stop dragging before it asks Windows to resize. Win RDP's larger resize took 0.20 s in
+two runs and 0.35 s in one.
 
-## Compared with Remmina
+Keypresses are close. Win RDP closes the Start menu slightly sooner, and Remmina opens it
+about 60 ms sooner. Windows opens the menu when the key is released, so Win RDP may be
+sending key releases late; that is not yet explained.
+
+Win RDP connected and signed in within 0.36 s and showed the desktop within 2.4 s.
+Remmina's connection time was not measured.
+
+## Memory and CPU compared with Remmina
 
 Both clients connected to the same local test server with a 1920×1080 desktop. The server
 draws random patterns, so this compares the clients, not a real Windows desktop.
@@ -31,7 +40,8 @@ draws random patterns, so this compares the clients, not a real Windows desktop.
 | Large screen changes: memory | 57 MiB | 167 MiB |
 
 With small changes Win RDP uses about half the CPU; with large changes the two use about
-the same. Win RDP uses about a third of the memory in both cases. How Win RDP redraws only the changed parts of the screen is in
+the same. Win RDP uses about a third of the memory in both cases. How Win RDP redraws only
+the changed parts of the screen is in
 [FRAMEBUFFER-PERFORMANCE.md](FRAMEBUFFER-PERFORMANCE.md).
 
 ## The launcher
@@ -51,8 +61,11 @@ the same. Win RDP uses about a third of the memory in both cases. How Win RDP re
 - Win RDP ran in a 1920×1080 window and Remmina full screen without scaling, both on the
   same separate X11 display. The test server is IronRDP's example server; the command is in
   [FRAMEBUFFER-PERFORMANCE.md](FRAMEBUFFER-PERFORMANCE.md).
-- Resize times run from releasing the window edge to the session log reporting the new
-  size, checked against screenshots taken about every 0.3 s. Key times were measured
-  through a nested Wayland compositor, which adds a little delay of its own.
+- On the Windows PC both clients ran in the same nested Wayland compositor, which adds a
+  little delay to both. Win RDP connected over UDP; Remmina over TCP, with dynamic
+  resolution and the graphics pipeline on. Resize times run from letting go of the window
+  edge to each client's log reporting the new size; "fully redrawn" is when the screen
+  stopped changing, from screenshots every 10 ms. Key times are to the first changed pixel
+  in part of the Start menu, the median of 5 presses.
 - Frame rates over UDP and TCP on a Windows host are in the
   [README](../README.md#measured-on-a-clean-lan).
