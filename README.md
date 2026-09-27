@@ -60,6 +60,9 @@ offers version 3, which the Windows hosts measured here do not answer at all, so
 bootstrap times out and both halves of the comparison quietly measure TCP. The launcher
 already passes `WINRDP_UDP_OFFER=2`, so installed sessions are unaffected.
 
+Memory, CPU, resize and keypress timings, with a comparison against Remmina, are in
+[docs/PERFORMANCE.md](docs/PERFORMANCE.md).
+
 ## The launcher
 
 A native Rust window built with [iced](https://iced.rs): no webview, no JavaScript.
