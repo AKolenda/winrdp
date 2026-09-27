@@ -23,6 +23,10 @@ available.
   dumps and frequent UDP diagnostics require trace logging; old session logs expire.
 - Build and release tasks use `cargo xtask`. `cargo xtask check` checks formatting,
   unused dependencies, Clippy, Rust documentation and tests. CI runs the same command.
+- The package no longer depends on FFmpeg, ICU, OpenH264, uriparser, Qt or FreeRDP, which
+  apt could not install outside Ubuntu 24.04. It is built on Ubuntu 22.04 and installs
+  with apt on Ubuntu 22.04 and 24.04 and Debian 12 and 13; the release workflow checks
+  each of them.
 
 Validation and remaining limits are recorded in [RELEASE-VALIDATION.md](RELEASE-VALIDATION.md).
 The rendering measurements use a local synthetic TCP server, not a Windows benchmark.

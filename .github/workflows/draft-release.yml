@@ -3,33 +3,102 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Existing tag matching the application version (for example v0.7.4)
+        description: Existing tag matching the application version (for example v0.8.0)
         required: true
         type: string
 permissions:
-  contents: write
+  contents: read
 jobs:
-  draft:
+  # Built on the oldest supported distribution. dpkg-shlibdeps takes the minimum library
+  # versions from the build host, so a package built on Ubuntu 24.04 demands glibc 2.39
+  # and its renamed libasound2t64, and apt refuses it on Ubuntu 22.04 and Debian 12.
+  # Built here, it asks for glibc 2.35 and libasound2, which newer releases still provide.
+  package:
     runs-on: ubuntu-latest
+    container: ubuntu:22.04
+    steps:
+      - name: Prepare an unprivileged build user
+        run: |
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install --yes --no-install-recommends git sudo curl ca-certificates
+          useradd --create-home builder
+          # xtask refuses to build as root and runs apt through sudo, as on a desktop.
+          printf 'Defaults env_keep += "DEBIAN_FRONTEND"\nbuilder ALL=(root) NOPASSWD: /usr/bin/apt-get\n' > /etc/sudoers.d/builder
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.tag }}
+          submodules: recursive
+          persist-credentials: false
+      - name: Build the package
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          chown -R builder: "$GITHUB_WORKSPACE"
+          runuser -u builder -- env HOME=/home/builder RELEASE_TAG="$RELEASE_TAG" DEBIAN_FRONTEND=noninteractive \
+            bash -euo pipefail -c '
+              curl --proto "=https" --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal
+              . "$HOME/.cargo/env"
+              cargo xtask install-deps --yes
+              cargo xtask check-release --tag "$RELEASE_TAG"
+              cargo xtask notices --check
+              cargo xtask deb
+              version="${RELEASE_TAG#v}"
+              tar czf "dist/winrdp-$version-dependency-notices.tar.gz" docs/licenses docs/rust-dependency-notices.json \
+                docs/THIRD-PARTY.md third_party/ironrdp/LICENSE-APACHE third_party/ironrdp/LICENSE-MIT
+            '
+      - uses: actions/upload-artifact@v7
+        with:
+          name: package
+          path: |
+            dist/*.deb
+            dist/*.deb.sha256
+            dist/package-report.json
+            dist/*-dependency-notices.tar.gz
+          if-no-files-found: error
+
+  # A clean system of each kind installs the package through apt, which resolves every
+  # Depends, and both programs start.
+  install:
+    needs: package
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [ubuntu:22.04, ubuntu:24.04, debian:12, debian:13]
+    runs-on: ubuntu-latest
+    container: ${{ matrix.image }}
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: package
+      - name: Install with apt and start both programs
+        run: |
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install --yes ./winrdp-next_*_amd64.deb
+          winrdp-next --version
+          winrdp-session --version
+
+  draft:
+    needs: [package, install]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v6
         with:
           ref: ${{ inputs.tag }}
-          fetch-depth: 0
-          submodules: recursive
           persist-credentials: false
-      - uses: dtolnay/rust-toolchain@stable
-      - name: Validate release source
-        env:
-          RELEASE_TAG: ${{ inputs.tag }}
-        run: |
-          cargo test --package xtask --locked
-          cargo xtask check-release --tag "$RELEASE_TAG"
-          cargo xtask notices --check
-          git show-ref --verify "refs/tags/$RELEASE_TAG"
+      - uses: actions/download-artifact@v8
+        with:
+          name: package
+          path: dist
       - name: Create reviewable draft
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ inputs.tag }}
         run: |
-          gh release create "$RELEASE_TAG" --verify-tag --draft --title "Win RDP $RELEASE_TAG" --notes-file docs/RELEASE-NOTES.md
+          # The notes are this version's section of the release notes, not the whole history.
+          version="${RELEASE_TAG#v}"
+          awk -v heading="# Win RDP $version" '$0 == heading { keep = 1; next } keep && /^# / { exit } keep' \
+            docs/RELEASE-NOTES.md > notes.md
+          test -s notes.md
+          gh release create "$RELEASE_TAG" --verify-tag --draft --title "Win RDP $RELEASE_TAG" --notes-file notes.md dist/*

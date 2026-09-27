@@ -30,8 +30,9 @@
 
 - Keep version fields synchronized; `cargo xtask check-release --tag v0.8.0` validates them.
 - Create and push the release tag only after the desired source is committed in both repos.
-- Run the manual **Prepare draft release** workflow against that tag. It creates a draft
-  and never publishes it automatically.
-- Attach the validated `.deb`, `.deb.sha256`, package report, dependency notices and any
-  corresponding-source archives to the draft. Use GitHub Releases for all downloads.
+- Run the manual **Prepare draft release** workflow against that tag. It builds the
+  package in an Ubuntu 22.04 container, so its dependencies are the oldest supported
+  versions, installs it with apt on clean Ubuntu 22.04 and 24.04 and Debian 12 and 13, and
+  only then creates a draft with the `.deb`, `.deb.sha256`, package report and dependency
+  notices attached. It never publishes. Use GitHub Releases for all downloads.
 - Review the draft's notes against recorded live-test results before publication.
