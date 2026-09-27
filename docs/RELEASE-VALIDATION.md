@@ -141,3 +141,23 @@ complete dynamic desktop resizing: a resize timeout exercised reconnection and
 local presentation, not a successful Windows resize negotiation. Native Wayland,
 Windows-host measurement/reactivation, redirected devices, live image clipboard
 and a clean-distribution installation remain unverified for this build.
+
+### Publication follow-up
+
+CI exposed a dependency-notice parser issue when `CARGO_TERM_COLOR=always`
+colored Cargo's repeated-node marker. The failure was reproduced locally;
+requesting `--color never` for the machine-read dependency tree fixes it without
+changing or weakening the inventory. The forced-color notice check, xtask
+formatting, strict Clippy and all 16 tooling tests pass after the fix.
+
+The website was deployed to <https://winrdp.app/> as Worker version
+`41127004-0fa0-40e5-bcdd-847b48852db2` (deployment
+`daa06e12-da99-4af7-a709-e181663591da`). Production checks at 320, 390, 768 and
+1,440 pixels returned HTTP 200 with no overflow and all five image elements
+loaded. Served CSS, logo and screenshots match the build; the custom missing-page
+response returns HTTP 404 with a working home link. The latest-release link still
+resolves to published release 0.7.7; the 0.8.0 package above was built locally.
+
+Cloudflare injects an analytics beacon that the site's existing CSP blocks,
+producing one console warning and one blocked request per page load. Page assets
+and navigation work. Neither the CSP nor analytics settings were changed.

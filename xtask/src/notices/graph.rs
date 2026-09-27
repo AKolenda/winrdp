@@ -84,8 +84,12 @@ pub(super) fn resolve(root: &Path) -> Result<Vec<Dependency>> {
 /// `packages`, resolved as a build of just those packages resolves them.
 fn tree(root: &Path, packages: &[&str]) -> Result<BTreeMap<Key, BTreeSet<String>>> {
     let mut cargo = util::cargo();
+    // CI can force colored output even through a pipe. Keep Cargo's repeated-node
+    // marker plain so ANSI escapes cannot become part of a recorded feature name.
     cargo.current_dir(root).args([
         "tree",
+        "--color",
+        "never",
         "--locked",
         "--edges",
         "normal,build",
