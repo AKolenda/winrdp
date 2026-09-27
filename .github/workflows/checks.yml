@@ -54,21 +54,3 @@ jobs:
         run: cargo test --manifest-path session/Cargo.toml --locked --lib
       - name: Lint
         run: cargo clippy --manifest-path session/Cargo.toml --locked --lib --tests -- -D warnings
-
-  # The classic engine's core and geometry tests, which likewise ran nowhere.
-  native:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          persist-credentials: false
-      - name: Install native build dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y cmake ninja-build
-      - name: Build and test the engine core
-        run: |
-          cmake -S native -B build/native -G Ninja -DCMAKE_BUILD_TYPE=Release \
-            -DBUILD_TESTING=ON -DWINRDP_CORE_ONLY=ON
-          cmake --build build/native
-          ctest --test-dir build/native --output-on-failure --timeout 90

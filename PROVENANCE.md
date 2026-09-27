@@ -30,14 +30,14 @@ transfer was contributed back and merged upstream as
 Upstream's licence files ship with the package as `IronRDP-LICENSE-MIT` and
 `IronRDP-LICENSE-APACHE`.
 
-## The classic engine
+## The retired classic engine
 
-`engine/` is the Qt/FreeRDP client that predates the IronRDP work and still drives
-in-tab sessions. Its core, profile and session sources were recovered unchanged
-from `/usr/share/velordp/source` inside the `win-rdp_0.4.0_all.deb` package, along
-with `tests/core_tests.cpp`, `tests/geometry_tests.cpp` and the original monitor
-SVG. `native/` is the GTK bridge and C ABI between that engine and the launcher
-shell, written for this project.
+Releases up to 0.7.7 also carried `engine/`, the Qt/FreeRDP client that predates the
+IronRDP work (recovered from the `win-rdp_0.4.0_all.deb` package), and `native/`, the
+GTK bridge that let it draw a desktop in a launcher tab. Both were removed once every
+session ran on IronRDP; git history keeps them. The launcher's computer-address and
+profile rules were ported to Rust (`src-tauri/src/endpoint.rs`), with the engine's
+address test cases.
 
 ## The launcher
 
@@ -47,8 +47,8 @@ project's work.
 
 ## Third-party notices
 
-`docs/THIRD-PARTY.md` records the bundled Qt and FreeRDP runtime with its source
-archives and local patches. `docs/rust-dependency-notices.json` inventories every
+`docs/THIRD-PARTY.md` lists what the source depends on; the package bundles no native
+libraries. `docs/rust-dependency-notices.json` inventories every
 Rust dependency with its registry checksum and source URL, and
 `docs/licenses/rust/` holds their licence texts. `tests/notice_checks.py` verifies
 that the inventory and the texts on disk agree.

@@ -6,7 +6,7 @@ ROOT=Path(__file__).resolve().parents[1]
 def load(name,path):
     spec=importlib.util.spec_from_file_location(name,path);module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module);return module
 pkg=load('package_binary',ROOT/'scripts/package-binary.py')
-pre=load('preflight',ROOT/'scripts/preflight.py')
+load('preflight',ROOT/'scripts/preflight.py')
 class RecoveryTests(unittest.TestCase):
     def test_manifest(self):
         config=json.loads((ROOT/'src-tauri/tauri.conf.json').read_text())
@@ -19,30 +19,17 @@ class RecoveryTests(unittest.TestCase):
     def test_no_fake_binary_package(self):
         with tempfile.TemporaryDirectory() as d:
             root=Path(d);binary=root/'binary';binary.write_text('not an executable');out=root/'dist'
-            with self.assertRaises(RuntimeError):pkg.package(binary,None,out)
+            with self.assertRaises(RuntimeError):pkg.package(binary,out)
             self.assertFalse(out.exists())
     def test_missing_binary(self):
         with tempfile.TemporaryDirectory() as d:
             root=Path(d)
-            with self.assertRaises(RuntimeError):pkg.package(root/'missing',None,root/'out')
+            with self.assertRaises(RuntimeError):pkg.package(root/'missing',root/'out')
             self.assertFalse((root/'out').exists())
-    def test_private_path_boundary(self):
-        with tempfile.TemporaryDirectory() as d:
-            root=Path(d);private=root/'runtime';private.mkdir();file=private/'a.so';file.touch()
-            outer=root/'outside.so';outer.touch();link=private/'link.so';link.symlink_to(outer)
-            self.assertTrue(pkg.inside(file,private));self.assertFalse(pkg.inside(outer,private))
-            self.assertFalse(pkg.inside(link,private));self.assertFalse(pkg.inside(file,None))
-    def test_env_is_private_first(self):
-        with tempfile.TemporaryDirectory() as d:
-            p=Path(d);(p/'lib/pkgconfig').mkdir(parents=True)
-            self.assertEqual(pre.runtime_env(p)['PKG_CONFIG_PATH'],str(p/'lib/pkgconfig'))
     def test_no_web_frame_transport(self):
-        js=(ROOT/'frontend/app.js').read_text();native=(ROOT/'native/bridge.cpp').read_text()
-        self.assertNotIn('toDataURL',js);self.assertNotIn('base64',js);self.assertIn('cairo_image_surface_create_for_data',native)
+        js=(ROOT/'frontend/app.js').read_text()
+        self.assertNotIn('toDataURL',js);self.assertNotIn('base64',js)
         self.assertNotIn('<canvas',(ROOT/'frontend/index.html').read_text())
-    def test_original_clipboard_fix_retained(self):
-        source=(ROOT/'engine/src/rdp_session.cpp').read_text()
-        self.assertIn('response.common.msgFlags',source);self.assertNotIn('response.msgFlags',source)
     def test_password_not_profile(self):
         rust=(ROOT/'src-tauri/src/main.rs').read_text();profile=rust.split('struct Profile {',1)[1].split('\n}',1)[0]
         self.assertNotIn('password',profile);self.assertIn('Zeroizing::new(password)',rust)
@@ -62,11 +49,15 @@ class RecoveryTests(unittest.TestCase):
         capabilities=json.loads((ROOT/'src-tauri/capabilities/main.json').read_text())
         self.assertEqual(capabilities['windows'],['main']);self.assertNotIn('remote',capabilities)
         self.assertFalse(any('shell' in p or 'fs:' in p for p in capabilities['permissions']))
-    def test_native_no_widgets_frontend(self):
-        cmake=(ROOT/'native/CMakeLists.txt').read_text()
-        self.assertNotIn('Qt6::Widgets',cmake);self.assertIn('Qt6::Network',cmake)
+    def test_rust_only(self):
+        # Every session runs in winrdp-session (IronRDP); nothing links a C/C++ RDP engine.
+        tracked=subprocess.run(['git','ls-files'],cwd=ROOT,capture_output=True,text=True,check=True).stdout.split()
+        self.assertEqual([f for f in tracked if f.endswith(('.c','.cc','.cpp','.h','.hpp'))],[])
+        self.assertNotIn('rustc-link-lib',(ROOT/'src-tauri/build.rs').read_text())
+        for text in [(ROOT/'src-tauri/Cargo.toml').read_text(),(ROOT/'scripts/build-deb.sh').read_text()]:
+            self.assertNotIn('freerdp',text.lower());self.assertNotIn('qt6',text.lower())
     def test_source_files(self):
-        for name in ['frontend/app.js','frontend/app.css','native/bridge.h','src-tauri/src/main.rs','BUILDING.md','PROVENANCE.md']:
+        for name in ['frontend/app.js','frontend/app.css','src-tauri/src/main.rs','src-tauri/src/endpoint.rs','BUILDING.md','PROVENANCE.md']:
             self.assertGreater((ROOT/name).stat().st_size,100)
     def test_metadata_xml(self):
         root=ET.parse(ROOT/'packaging/io.winrdp.Next.metainfo.xml').getroot()

@@ -48,12 +48,6 @@
     <div class="drag-area" data-drag aria-hidden="true"></div>
     <div class="captions"><button data-window="minimize" class="caption-button" aria-label="Minimize"><svg viewBox="0 0 16 16"><path d="M3 8h10"/></svg></button><button data-window="maximize" class="caption-button" aria-label="Maximize or restore"><svg viewBox="0 0 16 16"><rect x="3.5" y="3.5" width="9" height="9"/></svg></button><button class="caption-button close-caption" data-close-app aria-label="Close Win RDP"><svg viewBox="0 0 16 16"><path d="m4 4 8 8m0-8-8 8"/></svg></button></div>
   </header>
-  <section class="session-toolbar" id="session-toolbar" aria-label="Remote session controls" hidden>
-    <div class="session-name"><strong id="session-name"></strong><span id="session-state"></span></div>
-    <button class="quiet" id="send-cad">Ctrl+Alt+Delete</button>
-    <button class="quiet" id="session-clipboard" aria-pressed="true">Clipboard on</button>
-    <button id="session-fullscreen">Full screen</button><button id="disconnect" class="quiet danger-text">Disconnect</button>
-  </section>
   <div class="workspace" id="workspace">
     <aside class="sidebar">
       <div class="brand"><img src="assets/winrdp.svg" alt=""><strong>Win RDP</strong></div>
@@ -73,7 +67,6 @@
         <div id="saved-section"><h2 class="section-label" id="saved-label">Saved</h2><div class="list" id="saved-rows"></div></div>
         <div id="empty-state" class="empty-state" hidden><svg viewBox="0 0 48 48"><rect x="7" y="9" width="34" height="24" rx="3"/><path d="M24 33v6m-9 0h18m-9-24v12m-6-6h12"/></svg><h2>Add your first computer</h2><p>Save its address and username, or type an address in the search field and press Enter.</p><button id="empty-new">New computer</button></div>
       </section>
-      <section id="connecting-page" hidden><div class="connecting"><img src="assets/winrdp.svg" alt=""><h1 id="connecting-name">Connecting</h1><p id="connecting-stage">Starting the session</p><button id="cancel-connect">Cancel connection</button></div></section>
     </main>
   </div>
 </section>
@@ -93,9 +86,8 @@
   <p id="profile-error" class="form-error" role="alert" hidden></p></div>
   <div class="dialog-footer"><button type="button" class="danger-text" id="remove-computer" hidden>Remove</button><span class="spacer"></span><button type="button" data-close="computer-dialog">Cancel</button><button class="primary" type="submit">Save</button></div></form></dialog>
 
-<dialog id="password-dialog" class="win"><form id="password-form"><div class="dialog-heading"><h2 id="password-title">Connect</h2><button class="icon-close" type="button" data-close="password-dialog" aria-label="Close">×</button></div><div class="dialog-body"><p id="password-account"></p><p id="password-error" class="form-error" role="alert" hidden></p><label>Password<input id="password-input" type="password" required autocomplete="off" maxlength="4096"></label><label class="check-row"><input id="open-fullscreen" type="checkbox">Open full screen</label><label class="check-row" id="open-in-tab-row"><input id="open-in-tab" type="checkbox">Open in a tab inside Win RDP (classic engine, no RDP-UDP)</label><p class="hint">Use the Windows account password, not its PIN. Passwords are not saved.</p></div><div class="dialog-footer"><span class="spacer"></span><button type="button" data-close="password-dialog">Cancel</button><button class="primary" type="submit">Connect</button></div></form></dialog>
+<dialog id="password-dialog" class="win"><form id="password-form"><div class="dialog-heading"><h2 id="password-title">Connect</h2><button class="icon-close" type="button" data-close="password-dialog" aria-label="Close">×</button></div><div class="dialog-body"><p id="password-account"></p><p id="password-error" class="form-error" role="alert" hidden></p><label>Password<input id="password-input" type="password" required autocomplete="off" maxlength="4096"></label><label class="check-row"><input id="open-fullscreen" type="checkbox">Open full screen</label><p class="hint">Use the Windows account password, not its PIN. Passwords are not saved.</p></div><div class="dialog-footer"><span class="spacer"></span><button type="button" data-close="password-dialog">Cancel</button><button class="primary" type="submit">Connect</button></div></form></dialog>
 
-<dialog id="certificate-dialog" class="win"><div class="dialog-heading"><h2>Check this computer’s identity</h2></div><div class="dialog-body"><p>Compare this fingerprint with the remote computer before continuing.</p><pre id="certificate-details"></pre><p class="hint">Reject a changed or unexpected identity until you have verified it.</p></div><div class="dialog-footer"><span class="spacer"></span><button id="cert-reject">Reject</button><button id="cert-once">Connect once</button><button class="primary" id="cert-remember">Trust and connect</button></div></dialog>
 
 <dialog id="confirm-dialog" class="win confirm"><div class="dialog-body"><h2 id="confirm-title"></h2><p id="confirm-text"></p></div><div class="dialog-footer"><span class="spacer"></span><button class="primary" id="confirm-yes">Continue</button><button id="confirm-no">Cancel</button></div></dialog>
 
@@ -103,7 +95,7 @@
   <h3>Layout</h3>
   <div class="settings-panel">
     <label class="radio-row"><input type="radio" name="layout" value="simple"><span><strong>Simple</strong><small>One small window: pick a computer, connect. Every desktop opens in its own window.</small></span></label>
-    <label class="radio-row"><input type="radio" name="layout" value="full"><span><strong>Full</strong><small>Sidebar, search, and tabs. Adds the option to open a desktop in a tab with the classic engine.</small></span></label>
+    <label class="radio-row"><input type="radio" name="layout" value="full"><span><strong>Full</strong><small>Sidebar, search, and a tab for every open desktop.</small></span></label>
   </div>
   <h3>Appearance</h3>
   <div class="settings-panel">

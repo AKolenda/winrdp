@@ -34,19 +34,10 @@ is installed separately through [rustup](https://rustup.rs/). Use a current stab
 Rust toolchain; the IronRDP fork uses edition 2024. No Node or Tauri CLI is needed
 for the desktop build: the launcher frontend is plain HTML, CSS, and JavaScript.
 
-The native bridge also needs Qt >= 6.4 and FreeRDP >= 3.31 development libraries.
-A suitable private runtime under `~/.local/share/velordp/runtimes` is discovered
-automatically. A clean contributor machine must provide these dependencies from
-system packages or a compatible runtime; the apt helper does not build them.
-If your distro ships an older FreeRDP, build or install a suitable version first.
-To choose a runtime explicitly:
-
-```sh
-export WINRDP_RUNTIME=/path/to/qt-freerdp-runtime
-```
-
-The helper also installs the ALSA, Wayland, xkbcommon and XCB development packages
-the standalone session needs. Keep both committed Cargo lockfiles.
+Everything is Rust: there is no C or C++ engine and no Qt or FreeRDP to install.
+The helper installs the GTK and WebKitGTK packages the launcher needs, and the ALSA,
+Wayland, xkbcommon and XCB development packages the session window needs. CMake is
+used only by a Rust crypto crate's build script. Keep both committed Cargo lockfiles.
 
 ## Build and install
 
@@ -59,14 +50,13 @@ winrdp-next
 
 Use the filename printed by the build on other architectures. The default build
 uses four jobs; set `WINRDP_JOBS=2` on lower-memory systems. Both Rust executables
-build with `--locked`. The build runs the native C++ tests, verifies executable
+build with `--locked`. The build runs the launcher's Rust tests, verifies executable
 link dependencies, packages both executables, and writes SHA-256 checksums next
 to the Debian package. Build logs are under `logs/`.
 
-The package installs `winrdp-next` and `winrdp-session`. Libraries from a selected
-private runtime are included; GTK, WebKitGTK, glibc and graphics drivers come from
-system packages. Review [third-party notices](docs/THIRD-PARTY.md) before publishing
-binary releases, especially packages containing a private Qt/FreeRDP runtime.
+The package installs `winrdp-next` and `winrdp-session` and bundles no native
+libraries; GTK, WebKitGTK, glibc and graphics drivers come from system packages.
+Review [third-party notices](docs/THIRD-PARTY.md) before publishing binary releases.
 Downloads should be attached to [GitHub Releases](https://github.com/AKolenda/winrdp/releases).
 
 ## Verify changes
@@ -86,7 +76,6 @@ microphone or printer support on an actual supported Windows host.
 
 - Missing submodule sources: run `git submodule update --init --recursive`.
 - Missing development libraries: use the preflight errors to identify packages.
-  Do not mix incompatible distribution repositories to obtain FreeRDP.
 - Session binary missing: build both executables with the build script. For
   development only, `WINRDP_SESSION_BIN` can select another session executable.
 - Native window controls fail: try `WINRDP_SYSTEM_FRAME=1 winrdp-next`.
@@ -116,7 +105,6 @@ use when running `winrdp-session` by hand.
 | `WINRDP_EGFX` / `IRONRDP_EGFX` | `1` | The graphics pipeline (MS-RDPEGFX). `0` falls back to bitmap updates. |
 | `WINRDP_FULLSCREEN` | from the connect dialog | Opens the session window borderless full screen. |
 | `WINRDP_PRINTER` | unset | Offers a printer to the session: `default`, a CUPS destination name, or `folder:<dir>` to keep jobs as PostScript files. |
-| `WINRDP_ENGINE` | unset | `freerdp` uses the classic in-window engine instead of an IronRDP session window. |
 | `WINRDP_TITLE` | the saved computer name | The session window title, and the name the disconnect dialog asks about. |
 | `WINRDP_STATUS_FILE` | set by the launcher | Where the session publishes its transport, and why it stopped. The launcher reads it for the tab badge and the failure message. |
 | `WINRDP_SESSION_BIN` | the installed binary | Another session executable, for development. |

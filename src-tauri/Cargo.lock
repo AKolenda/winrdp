@@ -4335,14 +4335,10 @@ dependencies = [
 name = "winrdp-next"
 version = "0.7.7"
 dependencies = [
- "glib",
- "gtk",
- "pkg-config",
  "serde",
  "serde_json",
  "tauri",
  "tauri-build",
- "tokio",
  "uuid",
  "zeroize",
 ]

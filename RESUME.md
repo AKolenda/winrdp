@@ -71,8 +71,8 @@ rebuild, which is why they are not in 0.7.7.
   step, or state that it is manual.
 - **Validation gaps carried forward** (see `docs/RELEASE-VALIDATION.md`): native
   Wayland clipboard, live image and file clipboard transfer, microphone, printer and
-  remote audio, clean-distribution installation, the exact Qt/FreeRDP runtime build
-  configuration, and a UDP-against-TCP comparison on a lossy or high-latency link.
+  remote audio, clean-distribution installation, and a UDP-against-TCP comparison on a
+  lossy or high-latency link.
 - **Bandwidth-measure auto-detect PDUs are answered with nothing**
   (`ironrdp-session/src/x224/mod.rs`, "not yet implemented"). On one cold connection
   the server spent about 14 s and 20 MB on repeated network auto-detect that produced

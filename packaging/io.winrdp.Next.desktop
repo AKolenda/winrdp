@@ -7,6 +7,6 @@ Exec=winrdp-next
 Icon=winrdp-next
 Terminal=false
 Categories=Network;RemoteAccess;
-Keywords=RDP;Remote Desktop;Windows;FreeRDP;Win RDP;
+Keywords=RDP;Remote Desktop;Windows;IronRDP;Win RDP;
 StartupNotify=true
 StartupWMClass=winrdp-next

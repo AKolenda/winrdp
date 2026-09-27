@@ -6,15 +6,12 @@ const $ = id => document.getElementById(id);
 const PREVIEW_VERSION = '0.7.7';
 const nativeMode = Boolean(window.__TAURI__?.core?.invoke);
 let library = {version:1, computers:[], preferences:{dark:false,layout:'simple'}};
-let engine='freerdp', version='', localUser='';
+let version='', localUser='';
 let layout='simple', page='computers';
 let editing='', connectAfterSave=false, passwordProfile='', chosen='';     // chosen: profile id picked in the simple window
-let connectingId='', active='', requested='';
-const sessions=new Map();                           // id -> {name, profileId, state, clipboard, fullscreen, ended, external, transport}
+const sessions=new Map();                           // id -> {name, profileId, state, ended, transport}; each is its own window
 const closedSessions=new Set();
-let deferredEvents=[];
-let certificate=null, quitting=false;
-const certificates=[];
+let quitting=false;
 
 function text(tag, value, cls) { const e=document.createElement(tag); e.textContent=value; if(cls) e.className=cls; return e; }
 let messageTimer=0;
@@ -30,7 +27,7 @@ async function invoke(command, payload={}) {
   // Browser preview: enough of the backend to walk the screens. PREVIEW_VERSION is
   // what the published screenshots show, so scripts/check-release.py keeps it in
   // step with the package version.
-  if(command==='bootstrap') return {library,version:PREVIEW_VERSION,engine:'ironrdp',user:'alex',native:{attached:false,backend:'Browser preview'}};
+  if(command==='bootstrap') return {library,version:PREVIEW_VERSION,user:'alex'};
   if(command==='save_profile') {
     const p=structuredClone(payload.profile); p.id ||= crypto.randomUUID();
     library.computers=library.computers.filter(x=>x.id!==p.id); library.computers.push(p); return library;
@@ -41,11 +38,8 @@ async function invoke(command, payload={}) {
   if(command==='host_status') return {available:true,sharing:false,headless:true,mirror:false,enabled:true,credentials:false,port:3389};
   if(command==='host_enable'||command==='host_disable') return {ok:true};
   if(command==='session_status') return {ended:[],live:[]};
-  if(command==='poll_events') return [];
-  if(command==='session_action'&&payload.operation==='library') return {};
   throw new Error('This is a browser preview. Build and open Win RDP to connect.');
 }
-async function action(operation,payload={}) { return invoke('session_action',{operation,payload}); }
 
 // ---------- preferences, layout, theme ----------
 function applyTheme() {
@@ -160,13 +154,13 @@ $('simple-settings').onclick=run(openSettings);
 function renderTabs() {
   const root=$('tabs'); root.replaceChildren();
   for(const [id,s] of sessions) {
-    const tab=document.createElement('div'); tab.className='tab'+(active===id?' active':''); tab.setAttribute('role','tab'); tab.setAttribute('aria-selected',String(active===id)); tab.tabIndex=0;
+    const tab=document.createElement('div'); tab.className='tab'; tab.setAttribute('role','tab');
     const label=transportLabel(s)||s.state;
     tab.append(text('span','','dot'+(s.state==='Connected'?' on':'')), text('span',s.name,'tab-label'), text('span',label,'pill'+(s.transport?.transport==='udp'?' udp':'')));
     tab.title=s.transport?`${s.name}: graphics over ${label}`:`${s.name}: ${s.state}`;
     const close=document.createElement('button'); close.className='tab-close'; close.innerHTML='<svg viewBox="0 0 16 16"><path d="m4.6 4.6 6.8 6.8m0-6.8-6.8 6.8"/></svg>'; close.setAttribute('aria-label',`Disconnect ${s.name}`);
     close.onclick=run(async e=>{e.stopPropagation();await askDisconnect(id);});
-    tab.append(close); tab.onclick=run(()=>openSession(id)); tab.onkeydown=run(e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();return openSession(id);}});
+    tab.append(close);
     root.append(tab);
   }
   $('count-all').textContent=library.computers.length||''; $('count-fav').textContent=library.computers.filter(p=>p.favorite).length||'';
@@ -182,7 +176,7 @@ function rowFor(p, live) {
   const more=document.createElement('button'); more.className='more'; more.textContent='…'; more.setAttribute('aria-label',`Edit ${p.name}`); more.onclick=e=>{e.stopPropagation();editComputer(p.id);};
   act.append(go,more);
   row.append(monitorIcon(),name,text('span',p.address,'addr'),text('span',p.username||'Ask at connection','user'),state,act);
-  row.onclick=run(()=>{ if(live) return live.external?undefined:openSession([...sessions].find(([,s])=>s===live)[0]); promptPassword(p.id); });
+  row.onclick=run(()=>{ if(!live) promptPassword(p.id); });
   row.onkeydown=run(e=>{if(e.key==='Enter'){e.preventDefault();row.onclick();}});
   return row;
 }
@@ -199,11 +193,8 @@ function renderLibrary() {
   $('page-title').textContent=page==='favorites'?'Favourites':page==='open'?'Open now':'Computers';
   document.querySelectorAll('[data-page]').forEach(e=>e.classList.toggle('active',e.dataset.page===page));
 }
-async function showPage(next) {
-  await action('library'); active=''; connectingId=''; page=next;
-  document.body.classList.remove('session-mode'); $('session-toolbar').hidden=true;
-  $('library-page').hidden=false; $('connecting-page').hidden=true;
-  renderTabs(); renderLibrary();
+function showPage(next) {
+  page=next; renderTabs(); renderLibrary();
 }
 $('filter').oninput=renderLibrary;
 $('filter').onkeydown=run(async e=>{
@@ -216,30 +207,9 @@ document.querySelectorAll('[data-page]').forEach(e=>e.onclick=run(()=>showPage(e
 $('new-computer').onclick=()=>editComputer(); $('empty-new').onclick=()=>editComputer();
 $('full-settings').onclick=run(openSettings);
 
-// ---------- in-window (tab) sessions: classic engine ----------
-async function openSession(id) {
-  const s=sessions.get(id); if(!s) return;
-  if(s.external){renderTabs();return;}
-  requested=id;
-  if(s.state!=='Connected') {
-    await action('library'); active=id; connectingId=id;
-    document.body.classList.remove('session-mode'); $('session-toolbar').hidden=true;
-    $('library-page').hidden=true; $('connecting-page').hidden=false;
-    $('connecting-name').textContent=s.name; $('connecting-stage').textContent=s.state;
-    $('cancel-connect').textContent=s.ended?'Close session':'Cancel connection';
-  } else {
-    await action('select',{session:id}); active=id; connectingId='';
-    document.body.classList.add('session-mode'); $('session-toolbar').hidden=false;
-    $('session-name').textContent=s.name; $('session-state').textContent='Connected';
-    $('session-clipboard').textContent=s.clipboard?'Clipboard on':'Clipboard off'; $('session-clipboard').setAttribute('aria-pressed',String(s.clipboard));
-  }
-  renderTabs();
-}
 async function closeSession(id) {
-  const s=sessions.get(id); if(!s) return;
-  if(s.external){await invoke('kill_session',{id});sessions.delete(id);closedSessions.add(id);renderAll();return;}
-  await action('disconnect',{session:id}); sessions.delete(id); closedSessions.add(id);
-  if(requested===id) requested=''; if(active===id) await showPage('computers'); else renderAll();
+  if(!sessions.has(id)) return;
+  await invoke('kill_session',{id}); sessions.delete(id); closedSessions.add(id); renderAll();
 }
 // The Windows-style "are you sure" before a live desktop is dropped.
 async function askDisconnect(id) {
@@ -247,10 +217,6 @@ async function askDisconnect(id) {
   if(s.ended||s.state!=='Connected'){await closeSession(id);return;}
   confirm(`Disconnect from ${s.name}?`,'The remote session stays signed in on the computer. You can connect again to pick up where you left off.','Disconnect',()=>closeSession(id));
 }
-$('cancel-connect').onclick=run(()=>closeSession(connectingId)); $('disconnect').onclick=run(()=>askDisconnect(active));
-$('send-cad').onclick=run(()=>action('cad',{session:active}));
-$('session-clipboard').onclick=run(async()=>{const s=sessions.get(active);if(!s)return;s.clipboard=!s.clipboard;await action('clipboard',{session:active,enabled:s.clipboard});$('session-clipboard').textContent=s.clipboard?'Clipboard on':'Clipboard off';$('session-clipboard').setAttribute('aria-pressed',String(s.clipboard));});
-$('session-fullscreen').onclick=run(()=>invoke('window_action',{operation:'fullscreen'}));
 function renderAll(){ if(layout==='simple') renderSimple(); else { renderTabs(); renderLibrary(); } }
 
 // ---------- computer dialog ----------
@@ -294,22 +260,15 @@ function promptPassword(id, refused='') {
   passwordProfile=id; $('password-title').textContent=`Connect to ${p.name}`; $('password-account').textContent=`${p.username} at ${p.address}`;
   $('password-error').textContent=refused; $('password-error').hidden=!refused;
   $('open-fullscreen').checked=!!p.fullscreen;
-  $('open-in-tab-row').hidden=layout!=='full'||engine!=='ironrdp'; $('open-in-tab').checked=!!p.compatibility&&layout==='full';
   $('password-input').value=''; $('password-dialog').showModal(); $('password-input').focus();
 }
 $('password-form').onsubmit=run(async e=>{
   e.preventDefault(); let password=$('password-input').value; $('password-input').value=''; $('password-dialog').close();
   const p=library.computers.find(x=>x.id===passwordProfile); if(!p) return;
   const fullscreen=$('open-fullscreen').checked;
-  const inTab=layout==='full'&&engine==='ironrdp'&&$('open-in-tab').checked;
-  if(engine==='ironrdp'&&!inTab){
-    let launched; try{launched=await invoke('launch_session',{id:p.id,password,fullscreen});}finally{password='';}
-    sessions.set(launched.session,{name:p.name,profileId:p.id,state:'Connecting',clipboard:p.clipboard,fullscreen,ended:false,external:true,transport:null});
-    renderAll(); return;
-  }
-  let result; try{result=await invoke('connect_session',{id:p.id,password});}finally{password='';}
-  sessions.set(result.session,{name:p.name,profileId:p.id,state:'Connecting',clipboard:p.clipboard,fullscreen,ended:false,external:false,transport:null});
-  await openSession(result.session);
+  let launched; try{launched=await invoke('launch_session',{id:p.id,password,fullscreen});}finally{password='';}
+  sessions.set(launched.session,{name:p.name,profileId:p.id,state:'Connecting',ended:false,transport:null});
+  renderAll();
 });
 document.querySelectorAll('[data-close]').forEach(e=>e.onclick=()=>{$(e.dataset.close).close();$('password-input').value='';});
 $('password-dialog').addEventListener('close',()=>{$('password-input').value='';$('password-error').hidden=true;});
@@ -397,44 +356,20 @@ window.WinRdp={confirmClose:()=>{
 }};
 $('close-app').onclick=window.WinRdp.confirmClose; document.querySelectorAll('[data-close-app]').forEach(e=>e.onclick=window.WinRdp.confirmClose);
 
-// ---------- certificates and the event pump ----------
-async function nextCertificate() {
-  if(certificate||!certificates.length) return;
-  certificate=certificates.shift(); await action('library'); document.body.classList.remove('session-mode'); $('session-toolbar').hidden=true;
-  $('certificate-details').textContent=certificate.details; $('certificate-dialog').showModal();
-}
-async function answerCertificate(decision) {
-  if(!certificate) return; const current=certificate; certificate=null; $('certificate-dialog').close();
-  await action('certificate',{session:current.session,request:current.request,decision}); await nextCertificate();
-  if(!certificate&&requested&&sessions.get(requested)?.state==='Connected') await openSession(requested);
-}
-$('cert-reject').onclick=run(()=>answerCertificate(0)); $('cert-once').onclick=run(()=>answerCertificate(2)); $('cert-remember').onclick=run(()=>answerCertificate(1));
-$('certificate-dialog').addEventListener('cancel',run(e=>{e.preventDefault();return answerCertificate(0);}));
+// Session windows are separate processes; their state arrives through session_status.
 async function poll() {
   if(!nativeMode||quitting) return;
   try{
-    const events=[...deferredEvents,...await invoke('poll_events')]; deferredEvents=[];
     let changed=false;
-    for(const e of events){
-      const s=sessions.get(e.session);
-      if(e.kind==='certificate'){certificates.push(e);await nextCertificate();continue;}
-      if(!s){if(!closedSessions.has(e.session)&&deferredEvents.length<64)deferredEvents.push(e);continue;}
-      if(e.kind==='stage'){s.state=e.text;if(connectingId===e.session)$('connecting-stage').textContent=e.text;}
-      if(e.kind==='connected'){s.state='Connected';await stampConnected(s);changed=true;if(requested===e.session&&!certificate){await openSession(e.session);if(s.fullscreen){s.fullscreen=false;await invoke('window_action',{operation:'fullscreen'});}}}
-      if(e.kind==='ended'){s.state=e.text;s.ended=true;if(active===e.session){await action('library');document.body.classList.remove('session-mode');$('session-toolbar').hidden=true;await openSession(e.session);}message(e.text+(e.detail?'\n'+e.detail:''));}
-      if(e.kind==='warning')message(e.text);
-      if(e.kind==='input-released')message('Remote input released. Click the desktop to capture it again.');
-    }
-    if(engine==='ironrdp'){const st=await invoke('session_status');
-      for(const x of st.ended){const s=sessions.get(x.session);if(!sessions.delete(x.session))continue;closedSessions.add(x.session);changed=true;reportSessionEnd(s,x);}
-      for(const x of st.live||[]){const s=sessions.get(x.session);if(!s)continue;
-        const label=x.transport?.label||null;if((s.transport?.label||null)!==label){s.transport=x.transport;s.state=label?'Connected':s.state;changed=true;}
-        if(label) await stampConnected(s);}}
+    const st=await invoke('session_status');
+    for(const x of st.ended){const s=sessions.get(x.session);if(!sessions.delete(x.session))continue;closedSessions.add(x.session);changed=true;reportSessionEnd(s,x);}
+    for(const x of st.live||[]){const s=sessions.get(x.session);if(!s)continue;
+      const label=x.transport?.label||null;if((s.transport?.label||null)!==label){s.transport=x.transport;s.state=label?'Connected':s.state;changed=true;}
+      if(label) await stampConnected(s);}
     if(changed) renderAll();
   }catch(e){message(e.message||e);}finally{setTimeout(poll,180);}
 }
 window.addEventListener('keydown',run(async e=>{
-  if(e.ctrlKey&&e.altKey&&(e.key==='Enter'||e.key==='Home')){e.preventDefault();await invoke('window_action',{operation:e.key==='Home'?'restore':'fullscreen'});}
   if(e.ctrlKey&&e.key==='n'&&!document.querySelector('dialog[open]')){e.preventDefault();editComputer();}
   if(e.ctrlKey&&e.key===','&&!document.querySelector('dialog[open]')){e.preventDefault();await openSettings();}
 }));
@@ -446,14 +381,13 @@ run(async()=>{
       {id:'a2',name:'Lab',address:'192.0.2.20',username:'admin',group:'Work',favorite:false,clipboard:true,audio:true,microphone:false,printer:false,fullscreen:false,lastConnected:new Date(Date.now()-864e5).toISOString()},
       {id:'a3',name:'Studio',address:'192.0.2.30',username:'alex',group:'Personal',favorite:false,clipboard:true,audio:true,microphone:true,printer:false,fullscreen:true,lastConnected:new Date(Date.now()-3*864e5).toISOString()},
       {id:'a4',name:'Home PC',address:'192.0.2.40',username:'alex',group:'Personal',favorite:false,clipboard:true,audio:true,microphone:false,printer:false,fullscreen:false,lastConnected:''}];
-    if(new URLSearchParams(location.search).get('live')) sessions.set('s1',{name:'Office PC',profileId:'a1',state:'Connected',clipboard:true,fullscreen:false,ended:false,external:true,transport:{transport:'udp',udpVersion:2,label:'UDP v2'}});
+    if(new URLSearchParams(location.search).get('live')) sessions.set('s1',{name:'Office PC',profileId:'a1',state:'Connected',ended:false,transport:{transport:'udp',udpVersion:2,label:'UDP v2'}});
   }
-  const result=await invoke('bootstrap'); library=result.library; engine=result.engine||'freerdp'; version=result.version||''; localUser=result.user||'';
-  $('build-label').textContent=version?`Win RDP ${version}`:''; $('backend-info').textContent=nativeMode?`Win RDP ${version}. Sessions use the IronRDP engine; the classic FreeRDP engine drives in-tab desktops.`:'Browser design preview. No system changes or remote connections.';
+  const result=await invoke('bootstrap'); library=result.library; version=result.version||''; localUser=result.user||'';
+  $('build-label').textContent=version?`Win RDP ${version}`:''; $('backend-info').textContent=nativeMode?`Win RDP ${version}. Every desktop opens in its own window, powered by the IronRDP engine.`:'Browser design preview. No system changes or remote connections.';
   const wanted=new URLSearchParams(location.search).get('layout')||library.preferences.layout||'simple';
   await applyLayout(wanted, nativeMode);
   if(new URLSearchParams(location.search).get('open')==='settings') await openSettings();
 
-  if(nativeMode&&!result.native.attached) message('The native surface is not attached. In-tab desktops are unavailable until the app is restarted.');
   poll();
 })();

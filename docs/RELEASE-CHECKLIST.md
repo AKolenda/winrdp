@@ -23,9 +23,8 @@
   use, and the advertised image formats. Verify X11 and Wayland separately.
 - Test audio, microphone and printer features against Windows policies that allow them;
   record limitations instead of treating a successful build as proof.
-- Assemble notices and corresponding source for all bundled dependencies, including the
-  exact private Qt/FreeRDP build and Rust dependencies. Generic upstream links alone do
-  not establish the provenance of a locally patched runtime.
+- Assemble notices for all bundled dependencies: the Rust dependency graph and the
+  IronRDP fork. The package bundles no native libraries.
 
 ## GitHub release
 

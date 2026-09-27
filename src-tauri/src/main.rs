@@ -2,30 +2,15 @@
 #![cfg_attr(not(target_os = "linux"), allow(unused))]
 #[cfg(not(target_os = "linux"))]
 compile_error!("This recovery build targets Linux only.");
-use glib::translate::ToGlibPtr;
-use gtk::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use std::{ffi::{c_char, c_void, CStr, CString}, fs::{self, OpenOptions}, io::Write,
+use std::{fs::{self, OpenOptions}, io::Write,
           os::unix::fs::{OpenOptionsExt, PermissionsExt}, path::PathBuf, sync::Mutex, collections::HashMap};
 use tauri::{Manager, WebviewWindow};
-use zeroize::{Zeroize, Zeroizing};
+use zeroize::Zeroizing;
 
-extern "C" {
-    fn wr_attach(vbox: *mut c_void, web: *mut c_void) -> *mut c_char;
-    fn wr_command(op: *const c_char, json: *const c_char, password: *const c_char) -> *mut c_char;
-    fn wr_poll() -> *mut c_char;
-    fn wr_free(value: *mut c_char);
-}
-// Native APIs are invoked only inside run_on_main_thread/with_webview closures.
-unsafe fn decode(ptr: *mut c_char) -> Result<Value, String> {
-    if ptr.is_null() { return Err("The native backend returned no result.".into()); }
-    let parsed = serde_json::from_slice::<Value>(CStr::from_ptr(ptr).to_bytes());
-    wr_free(ptr);
-    let value = parsed.map_err(|_| "The native backend returned invalid JSON.".to_string())?;
-    if let Some(error) = value.get("error").and_then(Value::as_str) { return Err(error.to_owned()); }
-    Ok(value)
-}
+mod endpoint;
+
 fn trusted(window: &WebviewWindow) -> Result<(), String> {
     if window.label() != "main" { return Err("This window is not authorized.".into()); }
     let url = window.url().map_err(|e| e.to_string())?;
@@ -34,22 +19,6 @@ fn trusted(window: &WebviewWindow) -> Result<(), String> {
     if !local { return Err("Only packaged application pages may call the backend.".into()); }
     Ok(())
 }
-async fn native(window: &WebviewWindow, op: &str, payload: Value,
-                secret: Option<Zeroizing<String>>) -> Result<Value, String> {
-    trusted(window)?;
-    let op = CString::new(op).map_err(|_| "Invalid operation")?;
-    let payload = CString::new(payload.to_string()).map_err(|_| "Invalid payload")?;
-    let (send, recv) = tokio::sync::oneshot::channel();
-    window.run_on_main_thread(move || {
-        let mut bytes = secret.as_deref().map(|s| s.as_bytes().to_vec()).unwrap_or_default();
-        bytes.push(0);
-        let result = unsafe { decode(wr_command(op.as_ptr(), payload.as_ptr(), bytes.as_ptr().cast())) };
-        bytes.zeroize(); drop(secret);
-        let _ = send.send(result);
-    }).map_err(|e| e.to_string())?;
-    recv.await.map_err(|_| "The UI thread stopped.".to_string())?
-}
-
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct Profile {
@@ -71,11 +40,23 @@ struct Profile {
     #[serde(default)] last_connected: String,
 }
 fn yes() -> bool { true }
-/// Sessions run as separate winrdp-session processes (IronRDP engine) unless the
-/// classic in-window FreeRDP surface is requested with WINRDP_ENGINE=freerdp.
-fn engine() -> &'static str {
-    if std::env::var("WINRDP_ENGINE").map(|v| v == "freerdp").unwrap_or(false) { "freerdp" } else { "ironrdp" }
+impl Profile {
+    /// The rules of the retired C++ engine's Profile::validationError; lengths count UTF-16 units as Qt did.
+    fn validate(&self) -> Result<(), String> {
+        let units = |s: &str| s.encode_utf16().count();
+        if uuid::Uuid::parse_str(&self.id).map_or(true, |id| id.is_nil()) { return Err("The computer profile has an invalid identifier.".into()); }
+        if self.name.trim().is_empty() || units(&self.name) > 100 { return Err("Give this computer a name (up to 100 characters).".into()); }
+        endpoint::parse(&self.address)?;
+        if units(&self.username) > 256 || units(&self.group) > 80 { return Err("The username or group name is too long.".into()); }
+        if [&self.name, &self.username, &self.group].iter().any(|s| s.chars().any(|c| c < ' ' || c == '\x7f')) {
+            return Err("Names cannot contain control characters.".into());
+        }
+        if !matches!(self.graphics.as_str(), "auto" | "avc420" | "avc444") { return Err("Choose a supported graphics mode.".into()); }
+        if self.keyboard_layout == 0 { return Err("Choose a Windows keyboard layout.".into()); }
+        Ok(())
+    }
 }
+/// Every session is its own winrdp-session process (IronRDP engine) and window.
 struct Sessions { children: Mutex<HashMap<String, std::process::Child>> }
 fn session_binary() -> Result<PathBuf, String> {
     if let Some(p) = std::env::var_os("WINRDP_SESSION_BIN") { let p = PathBuf::from(p); if p.is_file() { return Ok(p); } }
@@ -231,15 +212,14 @@ impl Store {
 async fn bootstrap(window: WebviewWindow, app: tauri::AppHandle) -> Result<Value, String> {
     trusted(&window)?;
     let library = { let store = app.state::<Store>(); let _guard = store.lock.lock().map_err(|_| "Library lock failed")?; store.load()? };
-    let info = native(&window, "info", json!({}), None).await?;
-    Ok(json!({"library": library, "native": info, "version": env!("CARGO_PKG_VERSION"), "engine": engine(),
+    Ok(json!({"library": library, "version": env!("CARGO_PKG_VERSION"),
         "user": std::env::var("USER").unwrap_or_default()}))
 }
 #[tauri::command]
 async fn save_profile(window: WebviewWindow, app: tauri::AppHandle, mut profile: Profile) -> Result<Library, String> {
     trusted(&window)?;
     if profile.id.is_empty() { profile.id = uuid::Uuid::new_v4().to_string(); }
-    native(&window, "validate", serde_json::to_value(&profile).map_err(|e| e.to_string())?, None).await?;
+    profile.validate()?;
     let store = app.state::<Store>(); let _guard = store.lock.lock().map_err(|_| "Library lock failed")?;
     let mut library = store.load()?;
     if let Some(index) = library.computers.iter().position(|p| p.id == profile.id) { library.computers[index] = profile; }
@@ -259,39 +239,11 @@ fn save_preferences(window: WebviewWindow, app: tauri::AppHandle, preferences: P
     let mut library = store.load()?; library.preferences = preferences; store.save(&library)?; Ok(library)
 }
 #[tauri::command]
-async fn connect_session(window: WebviewWindow, app: tauri::AppHandle, id: String, password: String) -> Result<Value, String> {
-    trusted(&window)?;
-    let secret = Zeroizing::new(password);
-    if secret.is_empty() || secret.len() > 4096 || secret.contains('\0') { return Err("Enter an account password, up to 4096 bytes.".into()); }
-    let profile = { let store = app.state::<Store>(); let _guard = store.lock.lock().map_err(|_| "Library lock failed")?;
-        store.load()?.computers.into_iter().find(|p| p.id == id).ok_or("Computer no longer exists")? };
-    native(&window, "connect", json!({"profile": profile}), Some(secret)).await
-}
-#[tauri::command]
-async fn session_action(window: WebviewWindow, operation: String, payload: Value) -> Result<Value, String> {
-    // "release" (release every held key) was never reachable from the UI; the classic
-    // engine releases held keys itself on focus loss. Nothing may call it from here.
-    if !matches!(operation.as_str(), "select" | "library" | "disconnect" | "certificate" | "clipboard" | "cad") {
-        return Err("Unsupported session action.".into());
-    }
-    if payload.to_string().len() > 8192 { return Err("Request is too large.".into()); }
-    native(&window, &operation, payload, None).await
-}
-#[tauri::command]
-async fn poll_events(window: WebviewWindow) -> Result<Value, String> {
-    trusted(&window)?;
-    let (send, recv) = tokio::sync::oneshot::channel();
-    window.run_on_main_thread(move || { let _ = send.send(unsafe { decode(wr_poll()) }); }).map_err(|e| e.to_string())?;
-    recv.await.map_err(|_| "The UI thread stopped.".to_string())?
-}
-#[tauri::command]
 fn window_action(window: WebviewWindow, operation: String) -> Result<Value, String> {
     trusted(&window)?;
     match operation.as_str() {
         "minimize" => window.minimize(),
         "maximize" => if window.is_maximized().map_err(|e| e.to_string())? { window.unmaximize() } else { window.maximize() },
-        "fullscreen" => window.set_fullscreen(!window.is_fullscreen().map_err(|e| e.to_string())?),
-        "restore" => window.set_fullscreen(false),
         "drag" => window.start_dragging(),
         _ => return Err("Unsupported window action.".into()),
     }.map_err(|e| e.to_string())?;
@@ -397,23 +349,17 @@ fn open_host_settings(window: WebviewWindow) -> Result<Value, String> {
     Err("Could not open GNOME Settings. Open Settings, then System, then Remote Desktop.".into())
 }
 #[tauri::command]
-async fn quit(window: WebviewWindow, app: tauri::AppHandle) -> Result<(), String> {
-    native(&window, "stop-all", json!({}), None).await?;
+fn quit(window: WebviewWindow, app: tauri::AppHandle) -> Result<(), String> {
+    trusted(&window)?;
     if let Ok(mut map) = app.state::<Sessions>().children.lock() {
         for (_, child) in map.iter_mut() { let _ = child.kill(); let _ = child.wait(); }
         map.clear();
     }
-    // Never destroy a running native worker or its GTK callback data.
-    for _ in 0..300 {
-        if native(&window, "shutdown-ready", json!({}), None).await?["ready"] == true { app.exit(0); return Ok(()); }
-        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-    }
-    Err("A connection is still shutting down. Wait a moment, then close again.".into())
+    app.exit(0);
+    Ok(())
 }
 fn main() {
     if std::env::args().any(|a| a == "--version") { println!("Win RDP {}", env!("CARGO_PKG_VERSION")); return; }
-    // Decode in software: the hardware decoders are not part of what this build ships.
-    std::env::set_var("WINRDP_HWDECODER", "software");
     tauri::Builder::default()
         .setup(|app| {
             let path = app.path().app_config_dir()?.join("computers.json");
@@ -421,17 +367,6 @@ fn main() {
             app.manage(Sessions { children: Mutex::new(HashMap::new()) });
             let window = app.get_webview_window("main").ok_or("Main window missing")?;
             if std::env::var_os("WINRDP_SYSTEM_FRAME").is_some() { window.set_decorations(true)?; }
-            let vbox = window.default_vbox()?;
-            let pointer: *mut gtk::ffi::GtkBox = vbox.to_glib_none().0;
-            let pointer = pointer as usize;
-            window.with_webview(move |platform| {
-                let inner = platform.inner();
-                // Upcast to GTK's Widget so pointer typing is unambiguous.
-                let widget: gtk::Widget = inner.upcast();
-                let p: *mut gtk::ffi::GtkWidget = widget.to_glib_none().0;
-                let p = p.cast::<c_void>();
-                if let Err(reason) = unsafe { decode(wr_attach(pointer as *mut c_void, p)) } { eprintln!("Native attach failed: {reason}"); }
-            })?;
             Ok(())
         })
         .on_window_event(|window, event| {
@@ -441,7 +376,7 @@ fn main() {
             }
         })
         .invoke_handler(tauri::generate_handler![bootstrap, save_profile, delete_profile, save_preferences,
-            connect_session, session_action, poll_events, window_action, quit, launch_session, session_status, kill_session,
+            window_action, quit, launch_session, session_status, kill_session,
             set_layout, host_status, host_enable, host_disable, open_host_settings])
         .run(tauri::generate_context!())
         .expect("Win RDP Next could not start");

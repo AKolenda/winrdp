@@ -69,8 +69,8 @@ computer or type an address, press Enter. Every desktop opens in its own window.
 
 ![The simple launcher with example computers](website/public/assets/launcher.png)
 
-**Full** adds a sidebar, search, and tabs, and can open a desktop in a tab inside the
-launcher using the classic FreeRDP engine.
+**Full** adds a sidebar, search, and a tab for every open desktop. Desktops still open
+in their own windows.
 
 ![The full launcher layout with a sidebar, search, and saved computers](docs/screenshots/launcher-full.png)
 
@@ -110,11 +110,9 @@ desktop) and leaves any other RDP client on the machine alone.
 | Path | What it is |
 |---|---|
 | `frontend/` | The launcher UI: plain HTML, CSS, and JavaScript, no framework. |
-| `src-tauri/` | The launcher shell: Tauri, plus the classic in-window FreeRDP engine bridge. |
+| `src-tauri/` | The launcher shell: Tauri, the saved-computer library, and session process management. |
 | `session/` | `winrdp-session`, the IronRDP-based session window. |
 | `third_party/ironrdp/` | The IronRDP fork with RDP-UDP, the Linux clipboard backend, and the printer backend. |
-| `engine/` | The classic Qt/FreeRDP engine, used for in-tab sessions. |
-| `native/` | The GTK bridge between the launcher shell and that engine, and its CMake build. |
 | `website/` | Static release website; download links go to GitHub Releases. |
 
 ## Hosting

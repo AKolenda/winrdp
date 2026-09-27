@@ -20,11 +20,11 @@ export async function run({context,log=async()=>[]}) {
   await page.setContent(html);
   await page.addStyleTag({content:fs.readFileSync(new URL('frontend/app.css',root),'utf8')});
   await page.evaluate(()=>{
-    window.calls=[];window.events=[];
+    window.calls=[];
     window.testLibrary={version:1,computers:[{id:'office',name:'Office PC',address:'192.0.2.10',username:'alex',clipboard:true,audio:true},{id:'lab',name:'Lab',address:'192.0.2.20',username:'alex',clipboard:true,audio:true}],preferences:{layout:'simple'}};
     window.__TAURI__={core:{invoke:async(command,args={})=>{
       window.calls.push({command,...structuredClone(args)});
-      if(command==='bootstrap')return {library:structuredClone(window.testLibrary),version:'0.7.4',engine:'ironrdp',native:{attached:true}};
+      if(command==='bootstrap')return {library:structuredClone(window.testLibrary),version:'0.7.4'};
       if(command==='save_profile'){
         const p=structuredClone(args.profile);p.id ||= 'test-'+window.testLibrary.computers.length;
         const idx=window.testLibrary.computers.findIndex(x=>x.id===p.id);
@@ -32,7 +32,6 @@ export async function run({context,log=async()=>[]}) {
         return structuredClone(window.testLibrary);
       }
       if(command==='save_preferences'){window.testLibrary.preferences=args.preferences;return structuredClone(window.testLibrary);}
-      if(command==='poll_events')return window.events.splice(0);
       if(command==='session_status')return {ended:(window.endedSessions||[]).splice(0),live:(window.liveSessions||[])};
       if(command==='host_status')return {available:true,sharing:false,credentials:true};
       if(command==='launch_session')return {session:'mock-session'};
