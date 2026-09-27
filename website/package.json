@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "scripts": {
     "dev": "wrangler dev",
-    "build": "node build.mjs",
+    "build": "cargo xtask website",
     "deploy": "npm run build && wrangler deploy"
   },
   "devDependencies": {

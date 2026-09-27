@@ -62,6 +62,7 @@ already passes `WINRDP_UDP_OFFER=2`, so installed sessions are unaffected.
 
 ## The launcher
 
+A native Rust window built with [iced](https://iced.rs): no webview, no JavaScript.
 Two layouts, chosen in Settings.
 
 **Simple** is the default: one small window, the way the Windows client is. Pick a
@@ -98,8 +99,8 @@ redirection (Group Policy: Remote Desktop Session Host, Device and Resource Redi
 See [BUILDING.md](BUILDING.md) for prerequisites. Then:
 
 ```sh
-bash scripts/build-deb.sh
-sudo apt install ./dist/winrdp-next_0.7.7_amd64.deb
+cargo xtask deb
+sudo apt install ./dist/winrdp-next_0.8.0_amd64.deb
 ```
 
 The package installs `winrdp-next` (the launcher) and `winrdp-session` (one process per
@@ -109,8 +110,7 @@ desktop) and leaves any other RDP client on the machine alone.
 
 | Path | What it is |
 |---|---|
-| `frontend/` | The launcher UI: plain HTML, CSS, and JavaScript, no framework. |
-| `src-tauri/` | The launcher shell: Tauri, the saved-computer library, and session process management. |
+| `launcher/` | `winrdp-next`, the launcher window (iced): saved computers, settings, and one session process per desktop. |
 | `session/` | `winrdp-session`, the IronRDP-based session window. |
 | `third_party/ironrdp/` | The IronRDP fork with RDP-UDP, the Linux clipboard backend, and the printer backend. |
 | `website/` | Static release website; download links go to GitHub Releases. |

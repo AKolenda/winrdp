@@ -1,3 +1,37 @@
+# Win RDP 0.8.0
+
+The launcher is now a native Rust window built with iced. The application and its
+build tools no longer use Tauri, WebKitGTK, Qt or FreeRDP. Existing saved computers
+and preferences carry over. The compact connection window and full library remain
+available.
+
+- Launcher state, connection options, computer editing, session management and views
+  have separate modules. Shared option controls keep the two layouts consistent.
+- Failed saves stop the connection flow and preserve the current selection and
+  layout. Disabling printer sharing also clears an inherited printer setting.
+- The session converts and copies changed screen regions instead of the full desktop.
+  Pending updates accumulate until painted; buffer-age tracking restores old buffers
+  and removed overlays. See [the measured comparison](FRAMEBUFFER-PERFORMANCE.md).
+- Physical keyboard mappings fix numpad Enter, numpad divide and the Menu key.
+- A requested disconnect accepts the server closing its transport as a clean
+  shutdown; unsolicited closure and protocol errors still report failure.
+- The window uses an owned display handle. Rendering failures are reported to the
+  launcher instead of panicking.
+- The IronRDP fork answers bandwidth and round-trip measurements during connection,
+  active sessions and reactivation through one shared responder.
+- Printer spool files use a private directory and restrictive permissions. Packet
+  dumps and frequent UDP diagnostics require trace logging; old session logs expire.
+- Build and release tasks use `cargo xtask`. `cargo xtask check` checks formatting,
+  unused dependencies, Clippy, Rust documentation and tests. CI runs the same command.
+
+Validation and remaining limits are recorded in [RELEASE-VALIDATION.md](RELEASE-VALIDATION.md).
+The rendering measurements use a local synthetic TCP server, not a Windows benchmark.
+Native Wayland presentation, live Windows network-measurement behavior, redirected
+microphone/printer/audio and clean-distribution installation still require validation.
+The iced launcher does not yet expose an accessibility tree for screen readers.
+
+# Win RDP 0.7.7
+
 Win RDP 0.7.7 fixes the package itself, three ways a session could go wrong without saying so, and completes the third-party licence notices.
 
 Changes:

@@ -1,20 +1,19 @@
-#![allow(unused_crate_dependencies)] // false positives because there is both a library and a binary
-
 use anyhow::Context as _;
 use core::sync::atomic::{AtomicBool, Ordering};
+use ironrdp::client::framebuffer::SharedFramebuffer;
 use ironrdp::client::output_channel::output_channel;
 use ironrdp::client::rdp::{RdpClient, RdpOutputEvent};
 use ironrdp_daemon::daemon::{self, Daemon};
 use ironrdp_propertyset::PropertySet;
 use ironrdp_rpc::transport;
-use winrdp_session::app::{App, RpcApp, ViewerEvent};
-use winrdp_session::cli::ViewerConfig;
 use std::sync::Arc;
 use tokio::runtime;
 use tokio::sync::mpsc;
 use tracing::debug;
 use winit::dpi::PhysicalSize;
 use winit::event_loop::EventLoop;
+use winrdp_session::app::{App, RpcApp, ViewerEvent};
+use winrdp_session::cli::ViewerConfig;
 
 /// Report a failure that happened before there was a session window, then exit.
 ///
@@ -68,7 +67,8 @@ fn main() -> anyhow::Result<()> {
 
     #[cfg(windows)]
     let enable_smartcard = config.channels().rdpdr.smartcard;
-    let client = RdpClient::new(config, output_event_sender);
+    let frame = SharedFramebuffer::new();
+    let client = RdpClient::new(config, output_event_sender).with_shared_framebuffer(frame.clone());
     #[cfg(windows)]
     let client = attach_windows_rdpdr_backend(client, enable_smartcard)?;
     #[cfg(target_os = "linux")]
@@ -76,7 +76,7 @@ fn main() -> anyhow::Result<()> {
     let input_event_sender = client.input_sender();
 
     let mut app = starting!(
-        App::new(&event_loop, &input_event_sender, initial_window_size).context("unable to initialize App")
+        App::new(&event_loop, &input_event_sender, frame, initial_window_size).context("unable to initialize App")
     );
 
     let rt = starting!(

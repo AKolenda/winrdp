@@ -1,11 +1,8 @@
 /build/
 /dist/
 /logs/
-/src-tauri/target/
-/src-tauri/target-*/
-/session/target/
-/session/target-*/
-/src-tauri/gen/
+/target/
+/target-*/
 .env
 .env.*
 !.env.example

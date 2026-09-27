@@ -14,9 +14,13 @@ npm run dev
 npm run deploy
 ```
 
-The build copies only `public/` into `dist/`; legacy design concepts and local
-configuration are never deployed. Wrangler is pinned in the lockfile. The site
-has no analytics, cookies, external fonts, or JavaScript dependency at runtime.
+`npm run build` runs `cargo xtask website` (so it needs the Rust toolchain; see
+[BUILDING.md](../BUILDING.md)). It checks the home page (downloads go to the latest
+GitHub release, no pinned release is named, no installer is linked, the product tour
+is present), then copies only `public/` into `dist/`; legacy design concepts and
+local configuration are never deployed. Wrangler is pinned in
+the lockfile. The site has no analytics, cookies, external fonts, or JavaScript
+dependency at runtime.
 
 The screenshot uses fictional example computers and documentation IP addresses.
 

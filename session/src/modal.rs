@@ -6,7 +6,7 @@
 use ab_glyph::FontVec;
 use winit::dpi::PhysicalSize;
 
-use crate::bar::{blend_rect, draw_text, fill, load_font, outline, rounded_fill, text_width};
+use crate::drawing::{blend_rect, draw_text, fill, load_font, outline, rounded_fill, text_width};
 
 /// What the user chose.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -58,7 +58,10 @@ impl CloseDialog {
     /// Top-left corner of the panel, centred in `size`.
     fn origin(size: PhysicalSize<u32>) -> (usize, usize) {
         let (w, h) = (size.width as usize, size.height as usize);
-        (w.saturating_sub(WIDTH) / 2, h.saturating_sub(BODY_HEIGHT + FOOTER_HEIGHT) / 2)
+        (
+            w.saturating_sub(WIDTH) / 2,
+            h.saturating_sub(BODY_HEIGHT + FOOTER_HEIGHT) / 2,
+        )
     }
 
     /// Button rectangles as (choice, x0, y0, x1, y1).
@@ -121,13 +124,42 @@ impl CloseDialog {
         rounded_fill(pixels, stride, left, top, right, bottom, RADIUS, PANEL);
         fill(pixels, stride, left, top + BODY_HEIGHT, WIDTH, 1, BORDER);
         // Footer strip with rounded bottom corners (the fill's top corners are hidden under the body).
-        rounded_fill(pixels, stride, left, top + BODY_HEIGHT + 1, right, bottom, RADIUS, FOOTER);
-        fill(pixels, stride, left, top + BODY_HEIGHT + 1, WIDTH, RADIUS as usize, FOOTER);
+        rounded_fill(
+            pixels,
+            stride,
+            left,
+            top + BODY_HEIGHT + 1,
+            right,
+            bottom,
+            RADIUS,
+            FOOTER,
+        );
+        fill(
+            pixels,
+            stride,
+            left,
+            top + BODY_HEIGHT + 1,
+            WIDTH,
+            RADIUS as usize,
+            FOOTER,
+        );
         outline(pixels, stride, left, top, WIDTH, BODY_HEIGHT + FOOTER_HEIGHT, BORDER);
 
         let font = self.font.as_ref();
         let title = format!("Disconnect from {}?", self.computer);
-        draw_text(font, pixels, stride, size, left + PAD, top + 18, 22, TITLE_PX, &title, INK, true);
+        draw_text(
+            font,
+            pixels,
+            stride,
+            size,
+            left + PAD,
+            top + 18,
+            22,
+            TITLE_PX,
+            &title,
+            INK,
+            true,
+        );
         draw_text(
             font,
             pixels,
@@ -171,7 +203,19 @@ impl CloseDialog {
             };
             let tw = text_width(font, TEXT_PX, label);
             let tx = x0 + (x1 - x0).saturating_sub(tw) / 2;
-            draw_text(font, pixels, stride, size, tx, y0, y1 - y0, TEXT_PX, label, ink, choice == Choice::Disconnect);
+            draw_text(
+                font,
+                pixels,
+                stride,
+                size,
+                tx,
+                y0,
+                y1 - y0,
+                TEXT_PX,
+                label,
+                ink,
+                choice == Choice::Disconnect,
+            );
         }
     }
 }

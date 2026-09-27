@@ -10,11 +10,15 @@
 
 use std::time::{Duration, Instant};
 
-use ab_glyph::{Font as _, FontVec, PxScale, ScaleFont as _, point};
+use ab_glyph::FontVec;
 use winit::dpi::PhysicalSize;
+
+use crate::drawing::{blend, draw_text, fill, load_font, outline, rounded_fill, text_width};
 
 /// Bar height in pixels.
 pub const HEIGHT: usize = 32;
+/// The pin icon extends eight pixels above its vertical centre.
+const MIN_HEIGHT: usize = 16;
 const BUTTON: usize = 44;
 const TEXT_PAD: usize = 12;
 const TEXT_GAP: usize = 10;
@@ -35,13 +39,6 @@ const CLOSE_HOVER: u32 = 0x00_c4_2b_1c;
 const INK: u32 = 0x00_ff_ff_ff;
 const MUTED: u32 = 0x00_9d_9d_9d;
 const ACCENT: u32 = 0x00_60_cd_ff;
-
-const FONT_CANDIDATES: &[&str] = &[
-    "/usr/share/fonts/truetype/ubuntu/Ubuntu-R.ttf",
-    "/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf",
-    "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-    "/usr/share/fonts/TTF/DejaVuSans.ttf",
-];
 
 /// What the pointer is over.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -170,16 +167,24 @@ impl ConnectionBar {
         Some(hit)
     }
 
-    /// `(left, top, width, height)` of the bar in a window of `size`.
-    fn rect(&self, size: PhysicalSize<u32>) -> (usize, usize, usize, usize) {
+    /// `(left, top, width, height)` of the bar in a window of `size`: all that `paint` draws on.
+    pub fn rect(&self, size: PhysicalSize<u32>) -> (usize, usize, usize, usize) {
         let window_width = size.width as usize;
-        let text = self.measure(&self.title) + if self.transport.is_empty() { 0 } else { TEXT_GAP + self.measure(&self.transport) };
+        let text = self.measure(&self.title)
+            + if self.transport.is_empty() {
+                0
+            } else {
+                TEXT_GAP + self.measure(&self.transport)
+            };
         let width = (BUTTON + TEXT_PAD + text + TEXT_PAD + 2 * BUTTON).min(window_width);
         ((window_width - width) / 2, 0, width, HEIGHT.min(size.height as usize))
     }
 
     fn hit_at(&self, size: PhysicalSize<u32>, x: f64, y: f64) -> Option<Hit> {
         let (left, top, width, height) = self.rect(size);
+        if width < 3 * BUTTON || height < MIN_HEIGHT {
+            return None;
+        }
         let (left, top, right, bottom) = (left as f64, top as f64, (left + width) as f64, (top + height) as f64);
         if x < left || x >= right || y < top || y >= bottom {
             return None;
@@ -199,7 +204,7 @@ impl ConnectionBar {
     pub fn paint(&self, pixels: &mut [u32], size: PhysicalSize<u32>) {
         let stride = size.width as usize;
         let (left, top, width, height) = self.rect(size);
-        if width < 3 * BUTTON || height < 8 {
+        if width < 3 * BUTTON || height < MIN_HEIGHT {
             return;
         }
         let right = left + width;
@@ -222,7 +227,10 @@ impl ConnectionBar {
                 let (body, border) = match corner_x {
                     Some(cx) if py > fb - RADIUS => {
                         let d = ((px - cx).powi(2) + (py - (fb - RADIUS)).powi(2)).sqrt();
-                        ((RADIUS - d + 0.5).clamp(0.0, 1.0), (1.0 - (d - (RADIUS - 0.5)).abs()).clamp(0.0, 1.0))
+                        (
+                            (RADIUS - d + 0.5).clamp(0.0, 1.0),
+                            (1.0 - (d - (RADIUS - 0.5)).abs()).clamp(0.0, 1.0),
+                        )
                     }
                     _ => {
                         let edge = x == left || x + 1 == right || y + 1 == bottom;
@@ -267,7 +275,11 @@ impl ConnectionBar {
         x += self.draw_text(pixels, stride, size, x, top, height, &self.title, INK);
         if !self.transport.is_empty() {
             x += TEXT_GAP;
-            let color = if self.transport.starts_with("UDP") { ACCENT } else { MUTED };
+            let color = if self.transport.starts_with("UDP") {
+                ACCENT
+            } else {
+                MUTED
+            };
             self.draw_text(pixels, stride, size, x, top, height, &self.transport, color);
         }
     }
@@ -323,224 +335,48 @@ impl ConnectionBar {
         text: &str,
         color: u32,
     ) -> usize {
-        draw_text(self.font.as_ref(), pixels, stride, size, x0, top, height, TEXT_PX, text, color, false)
+        draw_text(
+            self.font.as_ref(),
+            pixels,
+            stride,
+            size,
+            x0,
+            top,
+            height,
+            TEXT_PX,
+            text,
+            color,
+            false,
+        )
     }
 }
 
-/// The system font the bar and the dialogs rasterize with, if one is installed.
-pub(crate) fn load_font() -> Option<FontVec> {
-    let font = FONT_CANDIDATES
-        .iter()
-        .find_map(|path| std::fs::read(path).ok())
-        .and_then(|bytes| FontVec::try_from_vec(bytes).ok());
-    if font.is_none() {
-        tracing::warn!("No system font found; using the built-in glyphs");
-    }
-    font
-}
+#[cfg(test)]
+mod tests {
+    use winit::dpi::PhysicalSize;
 
-/// Advance width of `text` at `px` pixels.
-pub(crate) fn text_width(font: Option<&FontVec>, px: f32, text: &str) -> usize {
-    match font {
-        Some(font) => {
-            let scaled = font.as_scaled(PxScale::from(px));
-            let mut width = 0.0;
-            let mut prev = None;
-            for ch in text.chars() {
-                let id = scaled.glyph_id(ch);
-                if let Some(prev) = prev {
-                    width += scaled.kern(prev, id);
-                }
-                width += scaled.h_advance(id);
-                prev = Some(id);
-            }
-            width.ceil() as usize
-        }
-        None => text.chars().count() * bitmap::ADVANCE,
-    }
-}
+    use super::{BUTTON, ConnectionBar, Hit, MIN_HEIGHT};
 
-/// Draw `text` vertically centred in a `height`-tall band starting at `top`;
-/// returns its advance. `bold` draws a second pass offset by a fraction of a
-/// pixel, since only a regular weight is loaded.
-#[allow(clippy::too_many_arguments)]
-pub(crate) fn draw_text(
-    font: Option<&FontVec>,
-    pixels: &mut [u32],
-    stride: usize,
-    size: PhysicalSize<u32>,
-    x0: usize,
-    top: usize,
-    height: usize,
-    px: f32,
-    text: &str,
-    color: u32,
-    bold: bool,
-) -> usize {
-    let Some(font) = font else {
-        return bitmap::draw(pixels, stride, x0, top + height.saturating_sub(bitmap::HEIGHT) / 2, text, color);
-    };
-    let scale = PxScale::from(px);
-    let scaled = font.as_scaled(scale);
-    let text_height = scaled.ascent() - scaled.descent();
-    let baseline = top as f32 + (height as f32 - text_height) / 2.0 + scaled.ascent();
-    let (max_x, max_y) = (size.width as i32, size.height as i32);
-    let passes: &[f32] = if bold { &[0.0, 0.7] } else { &[0.0] };
-    let mut advance = 0.0f32;
-    for offset in passes {
-        let mut x = x0 as f32 + offset;
-        let mut prev = None;
-        for ch in text.chars() {
-            let id = scaled.glyph_id(ch);
-            if let Some(prev) = prev {
-                x += scaled.kern(prev, id);
-            }
-            let glyph = id.with_scale_and_position(scale, point(x, baseline));
-            if let Some(outlined) = font.outline_glyph(glyph) {
-                let bounds = outlined.px_bounds();
-                outlined.draw(|gx, gy, coverage| {
-                    let px = bounds.min.x as i32 + gx as i32;
-                    let py = bounds.min.y as i32 + gy as i32;
-                    if px >= 0 && py >= 0 && px < max_x && py < max_y {
-                        let index = py as usize * stride + px as usize;
-                        pixels[index] = blend(pixels[index], color, coverage);
-                    }
-                });
-            }
-            x += scaled.h_advance(id);
-            prev = Some(id);
-        }
-        advance = x - x0 as f32 - offset;
-    }
-    advance.ceil() as usize
-}
+    #[test]
+    fn small_windows_never_draw_or_activate_controls_that_do_not_fit() {
+        let mut bar = ConnectionBar::new("Office PC".to_owned());
+        bar.font = None;
+        bar.hover = Some(Hit::Pin);
 
-/// Mix `color` over the rectangle at `coverage` (0..=1).
-#[allow(clippy::too_many_arguments)]
-pub(crate) fn blend_rect(pixels: &mut [u32], stride: usize, x: usize, y: usize, w: usize, h: usize, color: u32, coverage: f32) {
-    for yy in y..y + h {
-        for xx in x..x + w {
-            let index = yy * stride + xx;
-            pixels[index] = blend(pixels[index], color, coverage);
-        }
-    }
-}
+        for width in [0, 1, 131, 132, 200] {
+            for height in [0, 1, 7, 8, 15, 16, 31, 32] {
+                let size = PhysicalSize::new(width, height);
+                let mut pixels = vec![0; width as usize * height as usize];
+                bar.paint(&mut pixels, size);
 
-pub(crate) fn fill(pixels: &mut [u32], stride: usize, x: usize, y: usize, w: usize, h: usize, color: u32) {
-    for yy in y..y + h {
-        for xx in x..x + w {
-            pixels[yy * stride + xx] = color;
-        }
-    }
-}
-
-/// Fill the rectangle `[x0, x1) x [y0, y1)` with corners rounded by `radius`, anti-aliased.
-#[allow(clippy::too_many_arguments)]
-pub(crate) fn rounded_fill(pixels: &mut [u32], stride: usize, x0: usize, y0: usize, x1: usize, y1: usize, radius: f32, color: u32) {
-    let (l, t, r, b) = (x0 as f32, y0 as f32, x1 as f32, y1 as f32);
-    for y in y0..y1 {
-        for x in x0..x1 {
-            let (px, py) = (x as f32 + 0.5, y as f32 + 0.5);
-            // Signed distance to the rounded rectangle.
-            let cx = px.clamp(l + radius, r - radius);
-            let cy = py.clamp(t + radius, b - radius);
-            let d = ((px - cx).powi(2) + (py - cy).powi(2)).sqrt();
-            let coverage = (radius - d + 0.5).clamp(0.0, 1.0);
-            let index = y * stride + x;
-            pixels[index] = blend(pixels[index], color, coverage);
-        }
-    }
-}
-
-pub(crate) fn outline(pixels: &mut [u32], stride: usize, x: usize, y: usize, w: usize, h: usize, color: u32) {
-    fill(pixels, stride, x, y, w, 1, color);
-    fill(pixels, stride, x, y + h - 1, w, 1, color);
-    fill(pixels, stride, x, y, 1, h, color);
-    fill(pixels, stride, x + w - 1, y, 1, h, color);
-}
-
-/// Mix `fg` over `bg` by `coverage` (0..=1) per channel.
-pub(crate) fn blend(bg: u32, fg: u32, coverage: f32) -> u32 {
-    let mix = |shift: u32| {
-        let b = ((bg >> shift) & 0xff) as f32;
-        let f = ((fg >> shift) & 0xff) as f32;
-        ((b + (f - b) * coverage).round() as u32) << shift
-    };
-    mix(16) | mix(8) | mix(0)
-}
-
-/// Built-in 5x7 capitals and digits, used only when no system font is available.
-mod bitmap {
-    const SCALE: usize = 2;
-    const GLYPH_W: usize = 5;
-    const GLYPH_H: usize = 7;
-    pub const ADVANCE: usize = (GLYPH_W + 1) * SCALE;
-    pub const HEIGHT: usize = GLYPH_H * SCALE;
-
-    fn glyph(c: char) -> [u8; GLYPH_H] {
-        match c.to_ascii_uppercase() {
-            'A' => [0b01110, 0b10001, 0b10001, 0b11111, 0b10001, 0b10001, 0b10001],
-            'B' => [0b11110, 0b10001, 0b10001, 0b11110, 0b10001, 0b10001, 0b11110],
-            'C' => [0b01110, 0b10001, 0b10000, 0b10000, 0b10000, 0b10001, 0b01110],
-            'D' => [0b11110, 0b10001, 0b10001, 0b10001, 0b10001, 0b10001, 0b11110],
-            'E' => [0b11111, 0b10000, 0b10000, 0b11110, 0b10000, 0b10000, 0b11111],
-            'F' => [0b11111, 0b10000, 0b10000, 0b11110, 0b10000, 0b10000, 0b10000],
-            'G' => [0b01110, 0b10001, 0b10000, 0b10111, 0b10001, 0b10001, 0b01111],
-            'H' => [0b10001, 0b10001, 0b10001, 0b11111, 0b10001, 0b10001, 0b10001],
-            'I' => [0b01110, 0b00100, 0b00100, 0b00100, 0b00100, 0b00100, 0b01110],
-            'J' => [0b00111, 0b00010, 0b00010, 0b00010, 0b00010, 0b10010, 0b01100],
-            'K' => [0b10001, 0b10010, 0b10100, 0b11000, 0b10100, 0b10010, 0b10001],
-            'L' => [0b10000, 0b10000, 0b10000, 0b10000, 0b10000, 0b10000, 0b11111],
-            'M' => [0b10001, 0b11011, 0b10101, 0b10101, 0b10001, 0b10001, 0b10001],
-            'N' => [0b10001, 0b11001, 0b10101, 0b10011, 0b10001, 0b10001, 0b10001],
-            'O' => [0b01110, 0b10001, 0b10001, 0b10001, 0b10001, 0b10001, 0b01110],
-            'P' => [0b11110, 0b10001, 0b10001, 0b11110, 0b10000, 0b10000, 0b10000],
-            'Q' => [0b01110, 0b10001, 0b10001, 0b10001, 0b10101, 0b10010, 0b01101],
-            'R' => [0b11110, 0b10001, 0b10001, 0b11110, 0b10100, 0b10010, 0b10001],
-            'S' => [0b01111, 0b10000, 0b10000, 0b01110, 0b00001, 0b00001, 0b11110],
-            'T' => [0b11111, 0b00100, 0b00100, 0b00100, 0b00100, 0b00100, 0b00100],
-            'U' => [0b10001, 0b10001, 0b10001, 0b10001, 0b10001, 0b10001, 0b01110],
-            'V' => [0b10001, 0b10001, 0b10001, 0b10001, 0b10001, 0b01010, 0b00100],
-            'W' => [0b10001, 0b10001, 0b10001, 0b10101, 0b10101, 0b10101, 0b01010],
-            'X' => [0b10001, 0b10001, 0b01010, 0b00100, 0b01010, 0b10001, 0b10001],
-            'Y' => [0b10001, 0b10001, 0b01010, 0b00100, 0b00100, 0b00100, 0b00100],
-            'Z' => [0b11111, 0b00001, 0b00010, 0b00100, 0b01000, 0b10000, 0b11111],
-            '0' => [0b01110, 0b10001, 0b10011, 0b10101, 0b11001, 0b10001, 0b01110],
-            '1' => [0b00100, 0b01100, 0b00100, 0b00100, 0b00100, 0b00100, 0b01110],
-            '2' => [0b01110, 0b10001, 0b00001, 0b00010, 0b00100, 0b01000, 0b11111],
-            '3' => [0b11111, 0b00010, 0b00100, 0b00010, 0b00001, 0b10001, 0b01110],
-            '4' => [0b00010, 0b00110, 0b01010, 0b10010, 0b11111, 0b00010, 0b00010],
-            '5' => [0b11111, 0b10000, 0b11110, 0b00001, 0b00001, 0b10001, 0b01110],
-            '6' => [0b00110, 0b01000, 0b10000, 0b11110, 0b10001, 0b10001, 0b01110],
-            '7' => [0b11111, 0b00001, 0b00010, 0b00100, 0b01000, 0b01000, 0b01000],
-            '8' => [0b01110, 0b10001, 0b10001, 0b01110, 0b10001, 0b10001, 0b01110],
-            '9' => [0b01110, 0b10001, 0b10001, 0b01111, 0b00001, 0b00010, 0b01100],
-            '.' => [0b00000, 0b00000, 0b00000, 0b00000, 0b00000, 0b00110, 0b00110],
-            '-' => [0b00000, 0b00000, 0b00000, 0b11111, 0b00000, 0b00000, 0b00000],
-            _ => [0; GLYPH_H],
-        }
-    }
-
-    pub fn draw(pixels: &mut [u32], stride: usize, x0: usize, top: usize, text: &str, color: u32) -> usize {
-        let mut pen = x0;
-        for c in text.chars() {
-            for (row, bits) in glyph(c).iter().enumerate() {
-                for col in 0..GLYPH_W {
-                    if bits & (0b10000 >> col) == 0 {
-                        continue;
-                    }
-                    for dy in 0..SCALE {
-                        for dx in 0..SCALE {
-                            let index = (top + row * SCALE + dy) * stride + pen + col * SCALE + dx;
-                            if index < pixels.len() {
-                                pixels[index] = color;
-                            }
-                        }
-                    }
+                if (width as usize) < 3 * BUTTON || (height as usize) < MIN_HEIGHT {
+                    assert!(pixels.iter().all(|&pixel| pixel == 0), "painted into {size:?}");
+                    assert_eq!(bar.hit_at(size, 1.0, 1.0), None);
+                } else {
+                    assert!(pixels.iter().any(|&pixel| pixel != 0), "did not paint into {size:?}");
+                    assert_eq!(bar.hit_at(size, 1.0, 1.0), Some(Hit::Pin));
                 }
             }
-            pen += ADVANCE;
         }
-        pen - x0
     }
 }

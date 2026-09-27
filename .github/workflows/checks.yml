@@ -12,16 +12,16 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
+          # The notice check resolves the session's IronRDP path dependencies.
+          submodules: recursive
           persist-credentials: false
-      - name: Check source and packaging metadata
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Check release metadata, dependency notices and the website
         run: |
-          python3 tests/recovery_tests.py
-          python3 tests/command_error_checks.py
-          python3 tests/notice_checks.py
-          node --check frontend/app.js
-          node website/build.mjs
-          python3 scripts/check-release.py
-          python3 -m py_compile scripts/*.py
+          cargo xtask check-release
+          cargo xtask notices --check
+          cargo xtask website
       - name: Check packaging metadata against the freedesktop validators
         run: |
           sudo apt-get update
@@ -29,10 +29,9 @@ jobs:
           appstreamcli validate packaging/io.winrdp.Next.metainfo.xml
           desktop-file-validate packaging/io.winrdp.Next.desktop
 
-  # The session crate carries the connection-failure classification, the status
-  # file the launcher reads and the window's own logic. None of it was compiled
-  # by any workflow before, so a break reached master and a release tag unnoticed.
-  session:
+  # The launcher, the session window (its connection-failure classification, the
+  # status file the launcher reads) and xtask's packaging checks.
+  rust:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -41,16 +40,40 @@ jobs:
           persist-credentials: false
       - uses: dtolnay/rust-toolchain@stable
         with:
-          components: clippy
+          components: clippy, rustfmt
+      - uses: Swatinem/rust-cache@v2
+      - name: Install build dependencies
+        run: cargo xtask install-deps --yes
+      - name: Install dependency checker
+        run: cargo install cargo-machete --version 0.9.2 --locked
+      - name: Check formatting, dependencies, lints, Rust docs and tests
+        run: cargo xtask check
+
+  # Check the exact fork revision shipped by the app, using its pinned toolchain.
+  engine:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: third_party/ironrdp
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - uses: ./third_party/ironrdp/.github/actions/install-build-deps
       - uses: Swatinem/rust-cache@v2
         with:
-          workspaces: session
-      - name: Install session build dependencies
+          workspaces: third_party/ironrdp -> target
+      - name: Check fork formatting and lints
         run: |
-          sudo apt-get update
-          sudo apt-get install -y libasound2-dev libwayland-dev libxkbcommon-dev \
-            libxkbcommon-x11-dev libxcb1-dev pkg-config
-      - name: Test
-        run: cargo test --manifest-path session/Cargo.toml --locked --lib
-      - name: Lint
-        run: cargo clippy --manifest-path session/Cargo.toml --locked --lib --tests -- -D warnings
+          cargo xtask check fmt -v
+          cargo xtask check lints -v
+      - name: Test protocol, framebuffer, transport and printer behavior
+        run: |
+          cargo test --locked \
+            -p ironrdp-testsuite-core \
+            -p ironrdp-testsuite-extra \
+            -p ironrdp-rdpeudp \
+            -p ironrdp-rdpdr-native
+          # The fork disables automatic lib-test discovery for this crate.
+          cargo test --locked -p ironrdp-client --features rustls,all --lib

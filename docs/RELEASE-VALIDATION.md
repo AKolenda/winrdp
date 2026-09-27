@@ -78,3 +78,66 @@ had been idle, the server ran repeated network auto-detect cycles for about 14 s
 bandwidth-measure PDUs as "not yet implemented" (`crates/ironrdp-session/src/x224/mod.rs`).
 Only RTT requests are answered today. Later connections to the same host showed none of it,
 so the behaviour could not be reproduced on demand and no change was made.
+
+## Provisional 0.8.0 integration — 2026-09-26
+
+The native Rust launcher, shared framebuffer, session-module cleanup and shared
+network-autodetection responder are being integrated. The results below were
+completed on the protocol branch at fork commit
+`deea1ad7de4a7c9c8f9b90ecba16e4e0d73eb717`; they do not certify the final combined
+build. No live Windows host or existing user session was used for these checks.
+The earlier observation that only RTT requests receive responses is superseded
+by this implementation; its relationship to the historical cold-connection delay
+has not been established by a live test.
+
+| Protocol check | Completed result |
+| --- | --- |
+| Core test suite | `cargo test -p ironrdp-testsuite-core --locked`: 1,657 passed, 2 ignored. |
+| Focused autodetection tests | 84 passed, covering wire/state behavior, byte accounting, saturation, mismatched stop requests and activation-state transfer. |
+| Strict Clippy | Passed with `--all-targets --no-deps --locked -- -D warnings` for `ironrdp-autodetect`, `ironrdp-connector`, `ironrdp-session`, `ironrdp-fuzzing` and `ironrdp-testsuite-core`. |
+| Server example | Strict Clippy passed for the server example with `cliprdr,connector,rdpsnd,server` features. |
+| Minimal client build | `cargo check -p ironrdp-client --features rustls --locked` passed with an existing unused `reply_tunnel` warning. This was not a warning-free client Clippy result. |
+| `no_std` responder | `cargo check -p ironrdp-autodetect --no-default-features --locked` passed. |
+| Fuzz target | `cargo check --manifest-path fuzz/Cargo.toml --bin autodetect_state --locked` passed. The target compiled; no libFuzzer campaign was run. |
+| Formatting | Rustfmt checks passed for the 14 changed Rust files; `git diff --check` passed. |
+
+The completed local framebuffer comparison and its separate test results are
+recorded in [FRAMEBUFFER-PERFORMANCE.md](FRAMEBUFFER-PERFORMANCE.md). Those are
+synthetic loopback TCP/X11 measurements, not Windows or Wayland validation.
+
+Final combined application/fork static checks, regenerated dependency notices,
+release builds, package inspection and integrated smoke checks remain pending
+at this checkpoint. No final installation, deployment or live protocol result is
+claimed here. Windows-host bandwidth measurement/reactivation, native Wayland,
+redirected microphone/printer/audio, live image clipboard transfer and a clean
+supported-distribution installation remain validation gaps; Linux file clipboard
+transfer is unsupported. A lossy/high-latency UDP comparison is also still open.
+
+## Combined 0.8.0 verification — 2026-09-26
+
+The combined application uses IronRDP revision
+`0427e483817711feed7a271082e6afb0fe86c1e2`. The following checks ran after the
+launcher, renderer, autodetection and static-analysis changes were integrated.
+
+| Check | Result |
+| --- | --- |
+| Application quality gate | `cargo xtask check` passed: formatting, unused direct dependencies, strict Clippy for all targets, private-item Rustdoc with warnings denied, and 99 tests (50 launcher, 33 session, 16 tooling). The screenshot-export test is intentionally ignored by the normal test run. |
+| Fork quality gate | `cargo xtask check fmt -v` and `cargo xtask check lints -v` passed using the fork's pinned Rust 1.94.1 toolchain. The latter checks the entire workspace and all targets with `helper,__bench` features and warnings denied. |
+| Combined fork tests | `cargo test --locked -p ironrdp-testsuite-core -p ironrdp-testsuite-extra -p ironrdp-rdpeudp -p ironrdp-rdpdr-native` passed: 1,657 core tests (2 ignored), 109 extra tests, 195 UDP tests and 6 printer tests. The Windows-only printer test target ran no tests on Linux. |
+| Client shutdown regressions | `cargo test -p ironrdp-client --features rustls,all --lib` passed 47 tests. New cases distinguish expected EOF/reset/aborted errors after local shutdown from unsolicited closure, decoding failures and other read errors. The client disables automatic library-test discovery, so CI requests this target explicitly. |
+| Responder build boundaries | The final fork passed `cargo check -p ironrdp-autodetect --no-default-features --locked` and `cargo check --manifest-path fuzz/Cargo.toml --bin autodetect_state --locked`. This verifies the `no_std` build and fuzz-target compilation, not a fuzz campaign. |
+| Dependency notices | Regenerated and verified: 530 packages, 982 licence files, and the committed fork revision matches the inventory. |
+| Release metadata | `cargo xtask check-release --tag v0.8.0`, AppStream validation and desktop-entry validation passed. |
+| Package | `cargo xtask deb` built both release binaries and the amd64 package. Exact binary versions, dynamic dependencies and relocated executables were checked by the packager. The package checksum verified: `e3edf082c53f3b0cf673d931e1acabbb795eec18dd53a9145165096c4a213663`. No system package was installed. |
+| Packaged desktop smoke | The extracted final package launched its sibling session executable with an isolated profile on Xephyr/Openbox X11. Quick connect, rendered frames, keypad Enter/Divide/Menu extended scan codes, fullscreen, bar hide/reveal, window padding/clipping and dialog cancel passed. Requested Disconnect produced `connected -> closed`. A closed loopback port produced `failed/network`; stopping the owned server without requesting close produced `connected -> failed/session`. The server logged 227 RTT and 17 bandwidth measurements. |
+| Website | Rebuilt with `cargo xtask website`. Headless Chromium at 320, 390, 768 and 1,440 pixels reported no page, console or request errors, no horizontal overflow and all images decoded. The download targets GitHub's latest release. Narrow navigation wrapping was fixed and rechecked. Wrangler's deployment dry run passed with 11 static assets. |
+| Review | Independent review covered launcher failure state, shared rendering, protocol response state, package-version checks, the fork's conditional simplifications and publication history. Newly published source/history was checked for private credentials and attribution. |
+
+CI runs the application's quality gate and separately checks the exact pinned
+fork with the same formatting, Clippy and test-suite commands above.
+
+The packaged smoke used TCP and a synthetic loopback server. That server does not
+complete dynamic desktop resizing: a resize timeout exercised reconnection and
+local presentation, not a successful Windows resize negotiation. Native Wayland,
+Windows-host measurement/reactivation, redirected devices, live image clipboard
+and a clean-distribution installation remain unverified for this build.

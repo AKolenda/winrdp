@@ -1,26 +1,31 @@
 #![allow(clippy::print_stderr, clippy::print_stdout)] // allowed in this module only
 
-use core::num::NonZeroU32;
+use core::num::{NonZeroU16, NonZeroU32};
 use core::sync::atomic::{AtomicBool, Ordering};
 use core::time::Duration;
 use std::sync::Arc;
 use std::time::Instant;
 
-use anyhow::Context as _;
+use ironrdp::client::framebuffer::SharedFramebuffer;
 use ironrdp::client::rdp::{AutoReconnectDecision, RdpInputEvent, RdpInputSender, RdpOutputEvent};
 use ironrdp_daemon::daemon::{Daemon, ResizeError};
-use raw_window_handle::{DisplayHandle, HasDisplayHandle as _};
 use smallvec::SmallVec;
 use tracing::{debug, error, info, trace, warn};
 use winit::application::ApplicationHandler;
 use winit::dpi::{LogicalPosition, PhysicalSize};
 use winit::event::{self, WindowEvent};
-use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
+use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop, OwnedDisplayHandle};
 use winit::keyboard::{KeyCode, PhysicalKey};
-use winit::platform::scancode::PhysicalKeyExtScancode as _;
 use winit::window::{CursorIcon, CustomCursor, Window, WindowAttributes};
 
-type WindowSurface = (Arc<Window>, softbuffer::Surface<DisplayHandle<'static>, Arc<Window>>);
+use crate::damage::{self, Damage, Layout, Rect};
+use crate::status::{
+    Failure, connect_failure, transport_label, write_closed_status, write_failure_status, write_status_file,
+};
+
+pub use crate::status::{STARTUP_FAILURE_EXIT, report_startup_failure};
+
+type WindowSurface = (Arc<Window>, softbuffer::Surface<OwnedDisplayHandle, Arc<Window>>);
 
 /// Events delivered from the viewer-hosted RPC server to the window.
 pub enum ViewerEvent {
@@ -43,11 +48,19 @@ pub struct App {
 pub struct RpcApp {
     input_target: InputTarget,
     frame_wakeup: Option<Arc<AtomicBool>>,
-    context: softbuffer::Context<DisplayHandle<'static>>,
+    context: softbuffer::Context<OwnedDisplayHandle>,
     initial_window_size: PhysicalSize<u32>,
     window: Option<WindowSurface>,
-    buffer: Vec<u32>,
-    buffer_size: (u16, u16),
+    /// The remote desktop: written by the RDP session, or by [`Self::update_frame`] for
+    /// full frames, and presented from here.
+    frame: SharedFramebuffer,
+    /// The desktop size as of the last look at `frame`, so pointer input needs no lock.
+    /// Zero until the first frame.
+    desktop_size: (u16, u16),
+    /// What recent presents changed, to bring an older softbuffer buffer up to date.
+    history: damage::History,
+    /// The window areas the connection bar and the close dialog covered in the last present.
+    overlays: Damage,
     input_database: ironrdp::input::Database,
     last_size: Option<PhysicalSize<u32>>,
     resize_timeout: Option<Instant>,
@@ -62,6 +75,15 @@ pub struct RpcApp {
     /// What the process should exit with once the event loop stops, so a caller
     /// can tell a refused connection from a desktop the user closed.
     exit_code: i32,
+}
+
+/// How much of the window a draw presents.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Present {
+    /// What changed: a new frame area, and the overlays painted over it.
+    Changes,
+    /// The whole window: a redraw request from the window system or for a changed overlay.
+    Everything,
 }
 
 /// What the close dialog made of a window event.
@@ -85,12 +107,16 @@ enum CloseKind {
 
 /// A window with no desktop drawn in it yet is still connecting.
 fn close_kind(has_desktop: bool) -> CloseKind {
-    if has_desktop { CloseKind::Graceful } else { CloseKind::Cancel }
+    if has_desktop {
+        CloseKind::Graceful
+    } else {
+        CloseKind::Cancel
+    }
 }
 
 /// Where a pointer position in the window lands on the remote desktop.
 ///
-/// [`App::draw`] blits the remote frame 1:1 from the top-left and pads the rest
+/// [`RpcApp::present_frame`] blits the remote frame 1:1 from the top-left and pads the rest
 /// of the window black, so the pointer maps the same way. Scaling the position
 /// by the window size instead puts clicks in the wrong place for as long as the
 /// window and the desktop disagree, which is every pending resize and the whole
@@ -134,7 +160,7 @@ fn with_app_identity(attributes: WindowAttributes) -> WindowAttributes {
 /// The launcher's icon, for X11 window managers and taskbars that take the icon
 /// from the window rather than from the desktop file.
 fn app_icon() -> Option<winit::window::Icon> {
-    static PNG: &[u8] = include_bytes!("../../src-tauri/icons/icon.png");
+    static PNG: &[u8] = include_bytes!("../../packaging/icons/256.png");
     let mut decoder = png::Decoder::new(std::io::Cursor::new(PNG));
     decoder.set_transformations(png::Transformations::normalize_to_color8());
     let mut reader = decoder.read_info().ok()?;
@@ -143,7 +169,12 @@ fn app_icon() -> Option<winit::window::Icon> {
     buffer.truncate(info.buffer_size());
     let rgba = match info.color_type {
         png::ColorType::Rgba => buffer,
-        png::ColorType::Rgb => buffer.as_chunks::<3>().0.iter().flat_map(|px| [px[0], px[1], px[2], 0xFF]).collect(),
+        png::ColorType::Rgb => buffer
+            .as_chunks::<3>()
+            .0
+            .iter()
+            .flat_map(|px| [px[0], px[1], px[2], 0xFF])
+            .collect(),
         _ => return None,
     };
     winit::window::Icon::from_rgba(rgba, info.width, info.height).ok()
@@ -156,215 +187,6 @@ fn window_title() -> String {
         .unwrap_or_else(|_| "Win RDP".to_owned())
 }
 
-/// Human-readable transport, as shown in the window title: `UDP v2` when graphics
-/// flow over the reliable RDP-UDP tunnel, `TCP` otherwise.
-fn transport_label(reliable_udp: bool, udp_version: Option<u16>) -> String {
-    match (reliable_udp, udp_version) {
-        (true, Some(version)) => format!("UDP v{version}"),
-        (true, None) => "UDP".to_owned(),
-        (false, _) => "TCP".to_owned(),
-    }
-}
-
-/// Publish the transport for the launcher, which shows it on the session tab.
-/// The file named by `WINRDP_STATUS_FILE` is replaced atomically.
-fn write_status_file(reliable_udp: bool, udp_version: Option<u16>) {
-    write_status(&transport_status(reliable_udp, udp_version));
-}
-
-/// The transport record the launcher reads. It must keep carrying `label`: that
-/// is both what the tab shows and how the launcher tells a transport record
-/// apart from the failure record written when a session is refused.
-fn transport_status(reliable_udp: bool, udp_version: Option<u16>) -> String {
-    let version = udp_version.map_or("null".to_owned(), |v| v.to_string());
-    format!(
-        "{{\"state\":\"connected\",\"transport\":\"{}\",\"udpVersion\":{version},\"label\":\"{}\"}}\n",
-        if reliable_udp { "udp" } else { "tcp" },
-        transport_label(reliable_udp, udp_version)
-    )
-}
-
-/// Replaces the file named by `WINRDP_STATUS_FILE` atomically. Nothing to do
-/// when the session was started by hand rather than by the launcher.
-fn write_status(json: &str) {
-    let Some(path) = std::env::var_os("WINRDP_STATUS_FILE") else {
-        return;
-    };
-    let path = std::path::PathBuf::from(path);
-    let tmp = path.with_extension("tmp");
-    if let Err(error) = std::fs::write(&tmp, json).and_then(|()| std::fs::rename(&tmp, &path)) {
-        warn!(%error, ?path, "Could not write the session status file");
-    }
-}
-
-/// Minimal JSON string escaping, so a server-supplied reason cannot break the
-/// status file the launcher parses.
-fn escape(value: &str) -> String {
-    let mut out = String::with_capacity(value.len());
-    for c in value.chars() {
-        match c {
-            '"' => out.push_str("\\\""),
-            '\\' => out.push_str("\\\\"),
-            '\n' | '\r' => out.push(' '),
-            '\t' => out.push(' '),
-            c if (c as u32) < 0x20 => {}
-            c => out.push(c),
-        }
-    }
-    out
-}
-
-/// Why a session could not start, or stopped, in the words the launcher shows.
-///
-/// `reason` is a stable tag the launcher acts on: `credentials` makes it ask for
-/// the password again, `account` reports a sign-in the account itself cannot
-/// make, and the rest are informational. `detail` is the engine's own error
-/// text, shown under the sentence for the non-account reasons.
-struct Failure {
-    reason: &'static str,
-    message: String,
-    detail: String,
-}
-
-const WRONG_CREDENTIALS: &str = "The user name or password is incorrect.";
-
-/// The context the engine attaches to a failed TLS handshake. `ConnectorError`
-/// exposes its context only through the rendered report, so this is matched
-/// against that text.
-const TLS_UPGRADE: &str = "TLS upgrade";
-
-/// Windows states exactly why a sign-in was refused in the CredSSP NTSTATUS.
-/// Only a mistyped name or password is worth asking again for; the rest name a
-/// condition on the account that retyping cannot change.
-fn logon_status(code: ironrdp::connector::sspi::credssp::NStatusCode) -> Option<(&'static str, &'static str)> {
-    use ironrdp::connector::sspi::credssp::NStatusCode as N;
-
-    let known = if code == N::WRONG_PASSWORD || code == N::LOGON_FAILURE || code == N::NO_SUCH_USER
-        || code == N::INVALID_ACCOUNT_NAME
-    {
-        ("credentials", WRONG_CREDENTIALS)
-    } else if code == N::ACCOUNT_LOCKED_OUT {
-        ("account", "That account is locked out on the Windows computer. Wait, or ask an administrator to unlock it.")
-    } else if code == N::PASSWORD_EXPIRED || code == N::PASSWORD_MUST_CHANGE {
-        ("account", "That password has expired. Change it on the Windows computer, then connect again.")
-    } else if code == N::ACCOUNT_DISABLED {
-        ("account", "That account is disabled on the Windows computer.")
-    } else if code == N::INVALID_LOGON_HOURS {
-        ("account", "That account is not allowed to sign in at this time of day.")
-    } else if code == N::INVALID_WORKSTATION {
-        ("account", "That account is not allowed to sign in from this computer.")
-    } else if code == N::LOGON_TYPE_NOT_GRANTED || code == N::LOGON_NOT_GRANTED {
-        ("account", "That account may not sign in over Remote Desktop. Add it to the Remote Desktop Users group on the Windows computer.")
-    } else if code == N::SMARTCARD_LOGON_REQUIRED {
-        ("account", "That account must sign in with a smart card.")
-    } else if code == N::ACCOUNT_RESTRICTION {
-        ("account", "Windows refused this account. A blank password is not accepted over Remote Desktop.")
-    } else if code == N::NO_LOGON_SERVERS {
-        ("server", "No domain controller answered, so the account could not be checked.")
-    } else {
-        return None;
-    };
-    Some(known)
-}
-
-/// True when the failure bottoms out in an I/O error, which is what an
-/// unreachable or refusing host looks like from here.
-fn is_io_failure(error: &(dyn core::error::Error + 'static)) -> bool {
-    let mut next = error.source();
-    while let Some(source) = next {
-        if source.is::<std::io::Error>() {
-            return true;
-        }
-        next = source.source();
-    }
-    false
-}
-
-/// Turns a connect-time error into something worth showing a person.
-fn connect_failure(error: &ironrdp::connector::ConnectorError) -> Failure {
-    use ironrdp::connector::{ConnectorErrorKind as Kind, sspi};
-
-    let detail = error.report().to_string();
-    let (reason, message) = match error.kind() {
-        Kind::AccessDenied => ("credentials", WRONG_CREDENTIALS.to_owned()),
-        Kind::Credssp(source) => source
-            .nstatus
-            .and_then(logon_status)
-            .map(|(reason, message)| (reason, message.to_owned()))
-            .unwrap_or_else(|| {
-                if source.error_type == sspi::ErrorKind::LogonDenied {
-                    ("credentials", WRONG_CREDENTIALS.to_owned())
-                } else {
-                    ("server", format!("Windows refused the sign-in: {}.", source.description))
-                }
-            }),
-        Kind::Negotiation(failure) => (
-            "server",
-            format!("The Windows computer refused the connection: {failure}."),
-        ),
-        Kind::Reason(reason) => (
-            "server",
-            format!("The Windows computer refused the connection: {reason}."),
-        ),
-        Kind::Encode(_) | Kind::Decode(_) => (
-            "protocol",
-            "The Windows computer sent something this client could not read.".to_owned(),
-        ),
-        // The host answered on the RDP port and then failed the secure handshake,
-        // so the "is it switched on?" advice below would send the user the wrong way.
-        _ if detail.contains(TLS_UPGRADE) => (
-            "protocol",
-            "The Windows computer answered, but the secure connection could not be set up.".to_owned(),
-        ),
-        _ if is_io_failure(error) => (
-            "network",
-            "Could not reach the Windows computer. Check that it is switched on, reachable, and has Remote Desktop turned on.".to_owned(),
-        ),
-        kind => ("other", format!("The connection failed: {kind}.")),
-    };
-    Failure {
-        reason,
-        message,
-        detail,
-    }
-}
-
-/// Publishes why the session is stopping, for the launcher to show.
-fn write_failure_status(failure: &Failure) {
-    write_status(&format!(
-        "{{\"state\":\"failed\",\"reason\":\"{}\",\"message\":\"{}\",\"detail\":\"{}\"}}\n",
-        failure.reason,
-        escape(&failure.message),
-        escape(&failure.detail)
-    ));
-}
-
-/// Publishes an ordinary end of session, so the launcher stays quiet about it.
-fn write_closed_status() {
-    write_status("{\"state\":\"closed\"}\n");
-}
-
-/// What a session that never got as far as a window exits with. `EX_CONFIG` from
-/// `sysexits`, so a caller can tell it from a refused sign-in.
-pub const STARTUP_FAILURE_EXIT: i32 = 78;
-
-/// Publishes a failure that happened before there was a window to show it in.
-///
-/// Everything the launcher knows about a session comes from the status file and
-/// the log. A configuration error that only reaches stderr is discarded, and the
-/// launcher then tells the user to read a log that was never opened. Returns the
-/// exit code the process should use.
-pub fn report_startup_failure(error: &anyhow::Error) -> i32 {
-    let detail = format!("{error:#}");
-    error!(%detail, "The session could not start");
-    write_failure_status(&Failure {
-        reason: "config",
-        message: "This computer's connection settings could not be used.".to_owned(),
-        detail,
-    });
-    STARTUP_FAILURE_EXIT
-}
-
 impl App {
     /// What the process should exit with once the window is gone: non-zero when
     /// the connection was refused or dropped on an error.
@@ -372,9 +194,12 @@ impl App {
         self.inner.exit_code
     }
 
+    /// `frame` is the framebuffer the RDP client was given with
+    /// `RdpClient::with_shared_framebuffer`.
     pub fn new(
         event_loop: &EventLoop<RdpOutputEvent>,
         input_event_sender: &RdpInputSender,
+        frame: SharedFramebuffer,
         initial_window_size: PhysicalSize<u32>,
     ) -> anyhow::Result<Self> {
         Ok(Self {
@@ -382,6 +207,7 @@ impl App {
                 event_loop,
                 InputTarget::Direct(input_event_sender.clone()),
                 None,
+                frame,
                 initial_window_size,
             )?,
         })
@@ -399,6 +225,7 @@ impl RpcApp {
             event_loop,
             InputTarget::Rpc(daemon),
             Some(frame_wakeup),
+            SharedFramebuffer::new(),
             initial_window_size,
         )
     }
@@ -407,16 +234,10 @@ impl RpcApp {
         event_loop: &EventLoop<T>,
         input_target: InputTarget,
         frame_wakeup: Option<Arc<AtomicBool>>,
+        frame: SharedFramebuffer,
         initial_window_size: PhysicalSize<u32>,
     ) -> anyhow::Result<Self> {
-        // SAFETY: We drop the softbuffer context right before the event loop is stopped, thus making this safe.
-        // FIXME: This is not a sufficient proof and the API is actually unsound as-is.
-        let display_handle = unsafe {
-            core::mem::transmute::<DisplayHandle<'_>, DisplayHandle<'static>>(
-                event_loop.display_handle().context("get display handle")?,
-            )
-        };
-        let context = softbuffer::Context::new(display_handle)
+        let context = softbuffer::Context::new(event_loop.owned_display_handle())
             .map_err(|e| anyhow::anyhow!("unable to initialize softbuffer context: {e}"))?;
 
         let input_database = ironrdp::input::Database::new();
@@ -426,8 +247,10 @@ impl RpcApp {
             context,
             initial_window_size,
             window: None,
-            buffer: Vec::new(),
-            buffer_size: (0, 0),
+            frame,
+            desktop_size: (0, 0),
+            history: damage::History::default(),
+            overlays: Damage::new(),
             input_database,
             last_size: None,
             resize_timeout: None,
@@ -453,25 +276,27 @@ impl RpcApp {
         let height = u16::try_from(size.height).expect("reasonable height");
 
         match &self.input_target {
-            InputTarget::Direct(input_event_sender) => match input_event_sender.try_send(RdpInputEvent::Resize {
-                width,
-                height,
-                scale_factor,
-                // TODO: it should be possible to get the physical size here, however winit doesn't make it straightforward.
-                // FreeRDP does it based on DPI reading grabbed via [`SDL_GetDisplayDPI`](https://wiki.libsdl.org/SDL2/SDL_GetDisplayDPI):
-                // https://github.com/FreeRDP/FreeRDP/blob/ba8cf8cf2158018fb7abbedb51ab245f369be813/client/SDL/sdl_monitor.cpp#L250-L262
-                // See also: https://github.com/rust-windowing/winit/issues/826
-                physical_size: None,
-            }) {
-                Ok(()) => self.last_size = None,
-                Err(tokio::sync::mpsc::error::TrySendError::Full(_)) => {
-                    self.resize_timeout = Some(Instant::now() + Duration::from_millis(10));
+            InputTarget::Direct(input_event_sender) => {
+                match input_event_sender.try_send(RdpInputEvent::Resize {
+                    width,
+                    height,
+                    scale_factor,
+                    // TODO: it should be possible to get the physical size here, however winit doesn't make it straightforward.
+                    // FreeRDP does it based on DPI reading grabbed via [`SDL_GetDisplayDPI`](https://wiki.libsdl.org/SDL2/SDL_GetDisplayDPI):
+                    // https://github.com/FreeRDP/FreeRDP/blob/ba8cf8cf2158018fb7abbedb51ab245f369be813/client/SDL/sdl_monitor.cpp#L250-L262
+                    // See also: https://github.com/rust-windowing/winit/issues/826
+                    physical_size: None,
+                }) {
+                    Ok(()) => self.last_size = None,
+                    Err(tokio::sync::mpsc::error::TrySendError::Full(_)) => {
+                        self.resize_timeout = Some(Instant::now() + Duration::from_millis(10));
+                    }
+                    Err(_) => {
+                        self.last_size = None;
+                        warn!("Unable to enqueue resize event because the RDP session is closed");
+                    }
                 }
-                Err(_) => {
-                    self.last_size = None;
-                    warn!("Unable to enqueue resize event because the RDP session is closed");
-                }
-            },
+            }
             InputTarget::Rpc(daemon) => match daemon.try_resize(width, height) {
                 Ok(()) => self.last_size = None,
                 Err(ResizeError::Full) => self.resize_timeout = Some(Instant::now() + Duration::from_millis(10)),
@@ -483,76 +308,131 @@ impl RpcApp {
         }
     }
 
-    fn update_rpc_frame(&mut self) {
+    fn update_rpc_frame(&mut self, event_loop: &ActiveEventLoop) {
         let InputTarget::Rpc(daemon) = &self.input_target else {
             return;
         };
         let Some(frame) = daemon.current_frame() else {
             return;
         };
-        let (Some(width), Some(height)) = (
-            NonZeroU32::new(u32::from(frame.width)),
-            NonZeroU32::new(u32::from(frame.height)),
-        ) else {
-            return;
-        };
-        self.update_frame(frame.pixels, width, height);
-    }
-
-    fn update_frame(&mut self, buffer: Vec<u32>, width: NonZeroU32, height: NonZeroU32) {
-        let Some((window, _surface)) = self.window.as_mut() else {
+        let (Some(width), Some(height)) = (NonZeroU16::new(frame.width), NonZeroU16::new(frame.height)) else {
             return;
         };
         trace!(?width, ?height, "Received RPC-backed image");
-        self.buffer_size = (
-            u16::try_from(width.get()).expect("frame width fits in u16"),
-            u16::try_from(height.get()).expect("frame height fits in u16"),
-        );
-        self.buffer = buffer;
-        window.request_redraw();
+        self.update_frame(event_loop, frame.pixels, width, height);
     }
 
-    fn draw(&mut self) {
-        if self.buffer.is_empty() {
-            return;
+    /// Shows a full frame, as the RPC daemon and `RdpOutputEvent::Image` deliver them.
+    fn update_frame(&mut self, event_loop: &ActiveEventLoop, buffer: Vec<u32>, width: NonZeroU16, height: NonZeroU16) {
+        self.frame.lock().replace(buffer, width, height);
+        self.draw(event_loop, Present::Changes);
+    }
+
+    /// Whether a remote desktop has been received yet.
+    fn has_desktop(&self) -> bool {
+        self.desktop_size != (0, 0)
+    }
+
+    fn draw(&mut self, event_loop: &ActiveEventLoop, present: Present) {
+        if let Err(error) = self.present_frame(present) {
+            error!(%error, "Failed to present the remote desktop");
+            write_failure_status(&Failure {
+                reason: "display",
+                message: "The remote desktop window could not be updated.".to_owned(),
+                detail: error.to_string(),
+            });
+            self.exit_code = proc_exit::sysexits::OS_ERR.as_raw();
+            event_loop.exit();
         }
+    }
+
+    /// Paints the remote desktop, the connection bar and the close dialog into the window.
+    ///
+    /// Only what changed is copied and presented, as far as the buffer softbuffer hands out
+    /// allows (see [`damage::History`]). The frame is drawn 1:1 from the top-left corner
+    /// into the window's current size, not the desktop's: while a resize is pending the two
+    /// differ, and the uncovered area stays black until the server sends the new-size frame.
+    fn present_frame(&mut self, present: Present) -> Result<(), softbuffer::SoftBufferError> {
         let Some((window, surface)) = self.window.as_mut() else {
-            return;
+            return Ok(());
         };
-        // Present into the window's current size, not the remote desktop's. While a
-        // resize is pending the two differ; blitting the old frame at the old stride
-        // into a larger window skews every row, so copy row by row and clip, leaving
-        // the uncovered area black until the server sends the new-size frame.
+        let started = Instant::now();
         let size = window.inner_size();
         let (Some(width), Some(height)) = (NonZeroU32::new(size.width), NonZeroU32::new(size.height)) else {
-            return;
+            return Ok(());
         };
-        surface.resize(width, height).expect("surface resize");
-        let mut sb_buffer = surface.buffer_mut().expect("surface buffer");
-        let (buffer_width, buffer_height) = (usize::from(self.buffer_size.0), usize::from(self.buffer_size.1));
-        let (window_width, window_height) = (size.width as usize, size.height as usize);
-        if (buffer_width, buffer_height) == (window_width, window_height) && self.buffer.len() == sb_buffer.len() {
-            sb_buffer.copy_from_slice(self.buffer.as_slice());
-        } else {
-            let copy_width = buffer_width.min(window_width);
-            for y in 0..window_height {
-                let row = &mut sb_buffer[y * window_width..(y + 1) * window_width];
-                if y < buffer_height {
-                    let source = &self.buffer[y * buffer_width..y * buffer_width + copy_width];
-                    row[..copy_width].copy_from_slice(source);
-                    row[copy_width..].fill(0);
-                } else {
-                    row.fill(0);
+
+        // These calls can wait for the compositor or an X11 shared-memory transfer.
+        // Acquire the backbuffer before locking the frame so RDP updates can continue.
+        surface.resize(width, height)?;
+        let mut buffer = surface.buffer_mut()?;
+
+        let fullscreen = window.fullscreen().is_some();
+        let bar_shown = fullscreen && self.bar.is_shown();
+        let mut overlays = Damage::new();
+        if bar_shown {
+            let (left, top, width, height) = self.bar.rect(size);
+            overlays.extend(
+                Rect {
+                    x: left as u32,
+                    y: top as u32,
+                    width: width as u32,
+                    height: height as u32,
                 }
-            }
+                .clip(size),
+            );
         }
-        if window.fullscreen().is_some() && self.bar.is_shown() {
-            self.bar.paint(&mut sb_buffer, size);
+        if self.close_dialog.is_some() {
+            // It dims the whole desktop.
+            overlays.push(Rect::covering(size));
+        }
+        let mut frame = self.frame.lock();
+        self.desktop_size = (frame.width(), frame.height());
+        if self.desktop_size == (0, 0) {
+            // Nothing received yet.
+            return Ok(());
+        }
+        // A frame update with nothing left to paint: an earlier draw already took it.
+        let dirty = frame.take_dirty();
+        if present == Present::Changes && dirty.is_none() {
+            return Ok(());
+        }
+
+        // An overlay is repainted whole over the frame, and where one was painted last
+        // time the frame has to show again.
+        let mut changed: Damage = dirty
+            .and_then(|dirty| Rect::from(&dirty).clip(size))
+            .into_iter()
+            .collect();
+        changed.extend(overlays.iter().chain(&self.overlays).copied());
+
+        let layout = Layout {
+            window: size,
+            desktop: self.desktop_size,
+        };
+        let plan = self
+            .history
+            .plan(buffer.age(), layout, &changed, present == Present::Everything);
+        let frame_size = (usize::from(self.desktop_size.0), usize::from(self.desktop_size.1));
+        for rect in &plan.copy {
+            damage::blit(&mut buffer, size.width as usize, frame.pixels(), frame_size, *rect);
+        }
+        // The session waits on the frame to apply its next update; the rest needs none of it.
+        drop(frame);
+
+        if bar_shown {
+            self.bar.paint(&mut buffer, size);
         }
         if let Some(dialog) = self.close_dialog.as_ref() {
-            dialog.paint(&mut sb_buffer, size);
+            dialog.paint(&mut buffer, size);
         }
-        sb_buffer.present().expect("buffer present");
+        let rects: SmallVec<[softbuffer::Rect; 4]> =
+            plan.present.iter().filter_map(|rect| rect.to_softbuffer()).collect();
+        buffer.present_with_damage(&rects)?;
+        self.history.record(layout, plan.present);
+        self.overlays = overlays;
+        self.frame.lock().record_present(started.elapsed());
+        Ok(())
     }
 
     /// Leave or enter borderless full screen; the bar and Ctrl+Alt+Enter both land here.
@@ -576,7 +456,7 @@ impl RpcApp {
         if self.close_dialog.is_some() {
             return;
         }
-        if self.buffer.is_empty() {
+        if !self.has_desktop() {
             self.confirm_close(event_loop);
             return;
         }
@@ -646,7 +526,7 @@ impl RpcApp {
     /// Close the session the way the window's close button does.
     fn confirm_close(&mut self, event_loop: &ActiveEventLoop) {
         match &self.input_target {
-            InputTarget::Direct(input_event_sender) => match close_kind(!self.buffer.is_empty()) {
+            InputTarget::Direct(input_event_sender) => match close_kind(self.has_desktop()) {
                 CloseKind::Cancel => input_event_sender.request_close(),
                 CloseKind::Graceful => input_event_sender.request_graceful_close(),
             },
@@ -689,11 +569,20 @@ impl RpcApp {
                 if matches!(&self.input_target, InputTarget::Rpc(_)) {
                     window.set_cursor_visible(false);
                 }
-                let surface = softbuffer::Surface::new(&self.context, Arc::clone(&window)).expect("surface");
+                let surface = match softbuffer::Surface::new(&self.context, Arc::clone(&window)) {
+                    Ok(surface) => surface,
+                    Err(error) => {
+                        error!(%error, "Failed to create the remote desktop surface");
+                        self.exit_code = proc_exit::sysexits::OS_ERR.as_raw();
+                        event_loop.exit();
+                        return;
+                    }
+                };
                 self.window = Some((window, surface));
             }
             Err(error) => {
                 error!(%error, "Failed to create window");
+                self.exit_code = proc_exit::sysexits::OS_ERR.as_raw();
                 event_loop.exit();
             }
         }
@@ -773,7 +662,10 @@ impl RpcApp {
             WindowEvent::KeyboardInput { event, .. }
                 if self.modifiers.control_key()
                     && self.modifiers.alt_key()
-                    && matches!(event.physical_key, PhysicalKey::Code(KeyCode::Enter | KeyCode::NumpadEnter)) =>
+                    && matches!(
+                        event.physical_key,
+                        PhysicalKey::Code(KeyCode::Enter | KeyCode::NumpadEnter)
+                    ) =>
             {
                 // Ctrl+Alt+Enter toggles full screen locally, as in mstsc and the launcher.
                 if event.state == event::ElementState::Pressed && !event.repeat {
@@ -781,58 +673,33 @@ impl RpcApp {
                 }
             }
             WindowEvent::KeyboardInput { event, .. } => {
-                // `winit` scan codes are platform-specific, but RDP expects PC/AT set-1 scan codes.
-                // Override the navigation keys reported in #535 before using the existing fallback.
-                let mapped_scancode = match event.physical_key {
-                    // Send each physical modifier in the same stream as letters. A
-                    // later aggregate ModifiersChanged event cannot establish the
-                    // ordering needed by quick Ctrl+C / Ctrl+V combinations.
-                    PhysicalKey::Code(KeyCode::ShiftLeft) => Some(ironrdp::input::Scancode::from_u8(false, 0x2A)),
-                    PhysicalKey::Code(KeyCode::ShiftRight) => Some(ironrdp::input::Scancode::from_u8(false, 0x36)),
-                    PhysicalKey::Code(KeyCode::ControlLeft) => Some(ironrdp::input::Scancode::from_u8(false, 0x1D)),
-                    PhysicalKey::Code(KeyCode::ControlRight) => Some(ironrdp::input::Scancode::from_u8(true, 0x1D)),
-                    PhysicalKey::Code(KeyCode::AltLeft) => Some(ironrdp::input::Scancode::from_u8(false, 0x38)),
-                    PhysicalKey::Code(KeyCode::AltRight) => Some(ironrdp::input::Scancode::from_u8(true, 0x38)),
-                    PhysicalKey::Code(KeyCode::SuperLeft) => Some(ironrdp::input::Scancode::from_u8(true, 0x5B)),
-                    PhysicalKey::Code(KeyCode::SuperRight) => Some(ironrdp::input::Scancode::from_u8(true, 0x5C)),
-                    PhysicalKey::Code(KeyCode::Home) => Some(ironrdp::input::Scancode::from_u8(true, 0x47)),
-                    PhysicalKey::Code(KeyCode::ArrowUp) => Some(ironrdp::input::Scancode::from_u8(true, 0x48)),
-                    PhysicalKey::Code(KeyCode::PageUp) => Some(ironrdp::input::Scancode::from_u8(true, 0x49)),
-                    PhysicalKey::Code(KeyCode::ArrowLeft) => Some(ironrdp::input::Scancode::from_u8(true, 0x4B)),
-                    PhysicalKey::Code(KeyCode::ArrowRight) => Some(ironrdp::input::Scancode::from_u8(true, 0x4D)),
-                    PhysicalKey::Code(KeyCode::End) => Some(ironrdp::input::Scancode::from_u8(true, 0x4F)),
-                    PhysicalKey::Code(KeyCode::ArrowDown) => Some(ironrdp::input::Scancode::from_u8(true, 0x50)),
-                    PhysicalKey::Code(KeyCode::PageDown) => Some(ironrdp::input::Scancode::from_u8(true, 0x51)),
-                    PhysicalKey::Code(KeyCode::Insert) => Some(ironrdp::input::Scancode::from_u8(true, 0x52)),
-                    PhysicalKey::Code(KeyCode::Delete) => Some(ironrdp::input::Scancode::from_u8(true, 0x53)),
-                    _ => None,
-                };
-
-                let scancode = if let Some(scancode) = mapped_scancode {
-                    scancode
-                } else {
-                    let Some(scancode) = event.physical_key.to_scancode() else {
+                let key_code = match event.physical_key {
+                    PhysicalKey::Code(key_code) => key_code,
+                    PhysicalKey::Unidentified(native_key_code) => {
+                        warn!(?native_key_code, "Unsupported physical key; ignored");
                         return;
-                    };
-                    let Ok(scancode) = u16::try_from(scancode) else {
-                        warn!("Unsupported scancode: `{scancode:#X}`; ignored");
-                        return;
-                    };
-
-                    ironrdp::input::Scancode::from_u16(scancode)
+                    }
+                };
+                let Some((scancode, release_only)) = crate::keymap::map_key_code(key_code) else {
+                    warn!(?key_code, "Unsupported physical key; ignored");
+                    return;
+                };
+                let operations: SmallVec<[ironrdp::input::Operation; 2]> = match event.state {
+                    event::ElementState::Pressed => {
+                        smallvec::smallvec![ironrdp::input::Operation::KeyPressed(scancode)]
+                    }
+                    event::ElementState::Released if release_only => smallvec::smallvec![
+                        ironrdp::input::Operation::KeyPressed(scancode),
+                        ironrdp::input::Operation::KeyReleased(scancode),
+                    ],
+                    event::ElementState::Released => {
+                        smallvec::smallvec![ironrdp::input::Operation::KeyReleased(scancode)]
+                    }
                 };
 
-                let operation = match event.state {
-                    event::ElementState::Pressed => ironrdp::input::Operation::KeyPressed(scancode),
-                    event::ElementState::Released => ironrdp::input::Operation::KeyReleased(scancode),
-                };
-
-                apply_and_send_fast_path_events(
-                    &self.input_target,
-                    &mut self.input_database,
-                    core::iter::once(operation),
-                );
+                apply_and_send_fast_path_events(&self.input_target, &mut self.input_database, operations);
             }
+
             WindowEvent::ModifiersChanged(modifiers) => {
                 self.modifiers = modifiers.state();
             }
@@ -842,9 +709,15 @@ impl RpcApp {
                 // Alt+Tab. Release held inputs so the remote is not left with Ctrl
                 // or Alt stuck down when this window regains focus.
                 let keys = self.input_database.keyboard_state();
-                let operations = keys.iter_ones().map(|index| {
-                    ironrdp::input::Operation::KeyReleased(ironrdp::input::Scancode::from_u8(index >= 256, index as u8))
-                }).collect::<Vec<_>>();
+                let operations = keys
+                    .iter_ones()
+                    .map(|index| {
+                        ironrdp::input::Operation::KeyReleased(ironrdp::input::Scancode::from_u8(
+                            index >= 256,
+                            index as u8,
+                        ))
+                    })
+                    .collect::<Vec<_>>();
                 apply_and_send_fast_path_events(&self.input_target, &mut self.input_database, operations);
             }
             WindowEvent::CursorMoved { position, .. } => {
@@ -859,7 +732,7 @@ impl RpcApp {
                         return;
                     }
                 }
-                let Some((x, y)) = remote_pointer((position.x, position.y), self.buffer_size) else {
+                let Some((x, y)) = remote_pointer((position.x, position.y), self.desktop_size) else {
                     // Over the black padding beside a desktop smaller than the window.
                     return;
                 };
@@ -964,7 +837,7 @@ impl RpcApp {
                 }
             }
             WindowEvent::RedrawRequested => {
-                self.draw();
+                self.draw(event_loop, Present::Everything);
             }
             WindowEvent::ActivationTokenDone { .. }
             | WindowEvent::Moved(_)
@@ -995,7 +868,7 @@ impl RpcApp {
                 if let Some(frame_wakeup) = &self.frame_wakeup {
                     frame_wakeup.store(false, Ordering::Release);
                 }
-                self.update_rpc_frame();
+                self.update_rpc_frame(event_loop);
             }
             ViewerEvent::Shutdown => event_loop.exit(),
         }
@@ -1017,11 +890,11 @@ impl RpcApp {
             }
             RdpOutputEvent::Image { buffer, width, height } => {
                 trace!(width = ?width, height = ?height, "Received image with size");
-                trace!(window_physical_size = ?window.inner_size(), "Drawing image to the window with size");
-                self.buffer_size = (width.get(), height.get());
-                self.buffer = buffer;
-                window.request_redraw();
+                self.update_frame(event_loop, buffer, width, height);
             }
+            // Drawn straight away rather than through a redraw request, which on X11 is also
+            // how an exposed window asks to be repainted whole: see `Present::Everything`.
+            RdpOutputEvent::FramebufferUpdated => self.draw(event_loop, Present::Changes),
             RdpOutputEvent::ConnectionFailure(error) => {
                 error!(?error);
                 eprintln!("Connection error: {}", error.report().with_locations());
@@ -1217,101 +1090,7 @@ fn apply_and_send_fast_path_events(
 
 #[cfg(test)]
 mod tests {
-    use ironrdp::connector::sspi::credssp::NStatusCode;
-    use ironrdp::connector::{ConnectorError, ConnectorErrorKind, sspi};
-
-    use super::{CloseKind, WRONG_CREDENTIALS, close_kind, connect_failure, escape, remote_pointer, transport_status};
-
-    #[test]
-    fn a_connected_session_still_publishes_the_transport_the_launcher_shows() {
-        assert_eq!(
-            transport_status(true, Some(2)),
-            "{\"state\":\"connected\",\"transport\":\"udp\",\"udpVersion\":2,\"label\":\"UDP v2\"}\n"
-        );
-        assert_eq!(
-            transport_status(false, None),
-            "{\"state\":\"connected\",\"transport\":\"tcp\",\"udpVersion\":null,\"label\":\"TCP\"}\n"
-        );
-    }
-
-    fn credssp(error: sspi::Error) -> ConnectorError {
-        ConnectorError::new("CredSSP", ConnectorErrorKind::Credssp(error))
-    }
-
-    #[test]
-    fn early_user_auth_denial_is_a_credentials_failure() {
-        let failure = connect_failure(&ConnectorError::new("CredSSP", ConnectorErrorKind::AccessDenied));
-        assert_eq!(failure.reason, "credentials");
-        assert_eq!(failure.message, WRONG_CREDENTIALS);
-    }
-
-    #[test]
-    fn a_mistyped_password_is_worth_asking_again_for() {
-        for code in [
-            NStatusCode::WRONG_PASSWORD,
-            NStatusCode::LOGON_FAILURE,
-            NStatusCode::NO_SUCH_USER,
-            NStatusCode::INVALID_ACCOUNT_NAME,
-        ] {
-            let failure = connect_failure(&credssp(sspi::Error::new_with_nstatus(
-                sspi::ErrorKind::LogonDenied,
-                "logon failed",
-                code,
-            )));
-            assert_eq!(failure.reason, "credentials", "{code}");
-            assert_eq!(failure.message, WRONG_CREDENTIALS);
-        }
-    }
-
-    #[test]
-    fn a_condition_on_the_account_is_reported_but_not_retried() {
-        let failure = connect_failure(&credssp(sspi::Error::new_with_nstatus(
-            sspi::ErrorKind::LogonDenied,
-            "locked out",
-            NStatusCode::ACCOUNT_LOCKED_OUT,
-        )));
-        assert_eq!(failure.reason, "account");
-        assert!(failure.message.contains("locked out"), "{}", failure.message);
-    }
-
-    #[test]
-    fn credssp_without_a_status_still_names_the_credentials() {
-        let failure = connect_failure(&credssp(sspi::Error::new(sspi::ErrorKind::LogonDenied, "denied")));
-        assert_eq!(failure.reason, "credentials");
-    }
-
-    #[test]
-    fn an_unreachable_host_is_a_network_failure_not_a_password_one() {
-        let error = ConnectorError::new("connect", ConnectorErrorKind::Custom)
-            .with_source(std::io::Error::from(std::io::ErrorKind::ConnectionRefused));
-        let failure = connect_failure(&error);
-        assert_eq!(failure.reason, "network");
-    }
-
-    #[test]
-    fn a_refusal_reason_from_the_server_is_passed_on() {
-        let failure = connect_failure(&ConnectorError::new(
-            "negotiation",
-            ConnectorErrorKind::Reason("SSL required by server".to_owned()),
-        ));
-        assert_eq!(failure.reason, "server");
-        assert!(failure.message.contains("SSL required by server"), "{}", failure.message);
-    }
-
-    #[test]
-    fn status_text_cannot_break_out_of_the_json_the_launcher_parses() {
-        assert_eq!(escape("say \"hi\"\\ now"), "say \\\"hi\\\"\\\\ now");
-        assert_eq!(escape("two\nlines\u{1}"), "two lines");
-    }
-
-    #[test]
-    fn a_failed_secure_handshake_is_not_reported_as_an_unreachable_computer() {
-        let error = ConnectorError::new("TLS upgrade", ConnectorErrorKind::Custom)
-            .with_source(std::io::Error::from(std::io::ErrorKind::UnexpectedEof));
-        let failure = connect_failure(&error);
-        assert_eq!(failure.reason, "protocol");
-        assert!(failure.message.contains("secure connection"), "{}", failure.message);
-    }
+    use super::{CloseKind, close_kind, remote_pointer};
 
     #[test]
     fn closing_before_the_desktop_arrives_cancels_the_connection_attempt() {

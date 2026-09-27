@@ -16,13 +16,16 @@ jobs:
         with:
           ref: ${{ inputs.tag }}
           fetch-depth: 0
+          submodules: recursive
           persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
       - name: Validate release source
         env:
           RELEASE_TAG: ${{ inputs.tag }}
         run: |
-          python3 tests/recovery_tests.py
-          python3 scripts/check-release.py --tag "$RELEASE_TAG"
+          cargo test --package xtask --locked
+          cargo xtask check-release --tag "$RELEASE_TAG"
+          cargo xtask notices --check
           git show-ref --verify "refs/tags/$RELEASE_TAG"
       - name: Create reviewable draft
         env:

@@ -1,0 +1,2 @@
+# The session crate began as IronRDP's viewer; this keeps its line width.
+max_width = 120

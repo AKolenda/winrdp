@@ -9,12 +9,12 @@
   names; screenshots and doc comments are the usual carriers.
 - Make the IronRDP fork revision available before publishing an app revision that refers to it.
 - Confirm screenshots show demonstration profiles and contain no private desktop content.
-- Run `python3 tests/recovery_tests.py`, `python3 tests/notice_checks.py` and
-  `python3 scripts/check-release.py`.
+- Run `cargo xtask check`, `cargo xtask notices --check` and
+  `cargo xtask check-release`.
 
 ## Binary validation
 
-- Build both binaries with `bash scripts/build-deb.sh` and install the resulting package
+- Build both binaries with `cargo xtask deb` and install the resulting package
   in a clean supported distribution. Check launcher and session startup without a private
   development environment. Record the distribution and desktop session type.
 - Test new and saved computer connections, blank optional names, invalid credentials,
@@ -28,7 +28,7 @@
 
 ## GitHub release
 
-- Keep version fields synchronized; `scripts/check-release.py --tag v0.7.7` validates them.
+- Keep version fields synchronized; `cargo xtask check-release --tag v0.8.0` validates them.
 - Create and push the release tag only after the desired source is committed in both repos.
 - Run the manual **Prepare draft release** workflow against that tag. It creates a draft
   and never publishes it automatically.

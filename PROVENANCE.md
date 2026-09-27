@@ -36,22 +36,22 @@ Releases up to 0.7.7 also carried `engine/`, the Qt/FreeRDP client that predates
 IronRDP work (recovered from the `win-rdp_0.4.0_all.deb` package), and `native/`, the
 GTK bridge that let it draw a desktop in a launcher tab. Both were removed once every
 session ran on IronRDP; git history keeps them. The launcher's computer-address and
-profile rules were ported to Rust (`src-tauri/src/endpoint.rs`), with the engine's
+profile rules were ported to Rust (`launcher/src/endpoint.rs`), with the engine's
 address test cases.
 
 ## The launcher
 
-`src-tauri/` (the Tauri shell and its commands), `frontend/` (plain HTML, CSS and
-JavaScript, no framework), `scripts/`, `packaging/` and `website/` are this
-project's work.
+`launcher/` is this project's work: a native iced window that replaced the earlier
+Tauri shell and its HTML, CSS and JavaScript interface, keeping the same saved-computer
+library format and behaviour. `packaging/` and `website/` are this project's work too.
 
 ## Third-party notices
 
 `docs/THIRD-PARTY.md` lists what the source depends on; the package bundles no native
 libraries. `docs/rust-dependency-notices.json` inventories every
 Rust dependency with its registry checksum and source URL, and
-`docs/licenses/rust/` holds their licence texts. `tests/notice_checks.py` verifies
-that the inventory and the texts on disk agree.
+`docs/licenses/rust/` holds their licence texts. `cargo xtask notices --check`
+verifies that the inventory, `Cargo.lock` and the texts on disk agree.
 
 ## Licence
 

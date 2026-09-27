@@ -1,15 +1,11 @@
-#![cfg_attr(doc, doc = include_str!("../README.md"))]
-#![doc(html_logo_url = "https://cdnweb.devolutions.net/images/projects/devolutions/logos/devolutions-icon-shadow.svg")]
-#![allow(unused_crate_dependencies)] // false positives because there is both a library and a binary
+//! Native session window, input handling and configuration for Win RDP.
 
-// No need to be as strict as in production libraries
-#![allow(clippy::arithmetic_side_effects)]
-#![allow(clippy::cast_lossless)]
-#![allow(clippy::cast_possible_truncation)]
-#![allow(clippy::cast_possible_wrap)]
-#![allow(clippy::cast_sign_loss)]
+mod keymap;
 
 pub mod app;
 pub mod bar;
-pub mod modal;
 pub mod cli;
+mod damage;
+mod drawing;
+pub mod modal;
+mod status;

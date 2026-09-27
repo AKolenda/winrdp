@@ -57,7 +57,7 @@ h1 { font-size: clamp(46px, 5vw, 70px); font-weight: 600; line-height: 1.03; let
 .click-target { position: absolute; width: 24px; height: 24px; margin: -12px 0 0 -12px; border: 2px solid currentColor; border-radius: 50%; opacity: 0; pointer-events: none; }
 .target-address, .cursor-address { left: 31%; top: 15.8%; }
 .target-library, .cursor-library { left: 19%; top: 32.5%; }
-.target-connect, .cursor-connect { left: 86.5%; top: 87%; }
+.target-connect, .cursor-connect { left: 86.5%; top: 94%; }
 .target-address { color: var(--pink); animation: target-address 9s ease-in-out infinite; }
 .target-library { color: var(--violet); animation: target-library 9s ease-in-out infinite; }
 .target-connect { color: var(--mint); animation: target-connect 9s ease-in-out infinite; }
@@ -133,7 +133,7 @@ h2 { font-size: 38px; line-height: 1.17; letter-spacing: -1.3px; font-weight: 60
 @media (max-width: 720px) {
   .wrap { padding-inline: 22px; }
   .header { min-height: 90px; flex-wrap: wrap; gap: 12px; padding-block: 20px; }
-  .header nav { gap: 22px; font-size: 14px; }
+  .header nav { flex-wrap: wrap; gap: 22px; font-size: 14px; }
   .brand { font-size: 20px; }
   .hero-inner { grid-template-columns: 1fr; gap: 42px; min-height: 0; padding-block: 48px; }
   .hero h1 { font-size: 48px; }

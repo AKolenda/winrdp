@@ -1,80 +1,72 @@
-# Outstanding work
+# Resume — 2026-09-26
 
-What an audit of this tree found and what has not been done yet. Everything listed
-here was reproduced against the code, not guessed; the items that were fixed are in
-the 0.7.7 release notes and are not repeated.
+The 0.8.0 implementation is integrated. The completed changes and remaining
+product limits are listed below. Current and historical verification records are in
+[docs/RELEASE-VALIDATION.md](docs/RELEASE-VALIDATION.md).
 
-## Needs a decision or an action only the owner can take
+## Completed implementation
 
-- **Rotate the Windows password for the `novabila` test account.** It is in plain
-  text in `HANDOFF.md` at the tip of the private `winrdp-next` repository's master
-  and has been pushed to GitHub. Keeping that repository private limits the
-  exposure but does not remove it. Nothing in this repository is affected.
-- **Delete the stale `winrdp.openfuel-monorepo.workers.dev` Worker**, or point it
-  at https://winrdp.app. It still serves an old build of the site whose every
-  GitHub link targets the private repository (all 404 anonymously) and which
-  states the wrong licence. Nothing here deploys or tests that target, so it will
-  keep drifting.
+- The launcher and build tools are native Rust. Launcher messages/state, computer
+  editing, connection management and views have separate modules; both layouts
+  share connection options and controls. Failed saves preserve selection and
+  layout and stop connection attempts. Editing the selected computer in Full
+  layout now refreshes the options used by Simple layout.
+- Session event handling, drawing, status reporting and physical-key mapping have
+  separate responsibilities. Numpad Enter, numpad divide and Menu mappings are
+  fixed. Rendering uses an owned display handle and reports presentation errors.
+- The client and session share a persistent framebuffer. Updates accumulate until
+  painted; conversion and presentation copy changed regions, with buffer-age,
+  resize and overlay restoration handling. Local synthetic TCP measurements and
+  their limits are in [docs/FRAMEBUFFER-PERFORMANCE.md](docs/FRAMEBUFFER-PERFORMANCE.md).
+- The fork's shared `ironrdp-autodetect` responder handles RTT and bandwidth
+  measurements in connection, active-session and reactivation paths. Drivers
+  supply timing and received-byte counts; the responder performs no I/O. Tests
+  cover wire encoding, measurement state, byte accounting and activation transfer.
+- Fork fixes restore `drain_output`'s `must_use` contract, use private printer
+  spool files and move packet dumps and frequent UDP diagnostics to trace level.
+- `cargo xtask check` and CI run formatting, unused-dependency analysis, Clippy,
+  Rustdoc and workspace tests. Notice collection is split into graph and upstream
+  retrieval modules. Package creation checks both binaries' exact versions.
+  See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for boundaries and lint policy.
 
-## The IronRDP fork (`third_party/ironrdp`, branch `winrdp`)
+## Combined verification
 
-Each of these needs a commit in the fork, a submodule pointer bump here and a
-rebuild, which is why they are not in 0.7.7.
+- `cargo xtask check` passes all formatting, dependency, Clippy, Rustdoc and
+  application test checks: 99 tests passed, one screenshot-export test ignored.
+- The fork's full-workspace formatting and strict Clippy checks pass. Its core,
+  extra, UDP and printer suites pass 1,967 tests, with two core tests ignored.
+  Another 47 client tests cover shutdown and other client behavior. App CI runs
+  these checks against the exact pinned fork revision.
+- Dependency notices agree: 530 packages and 982 licence files. Release metadata,
+  AppStream and desktop-entry validation pass. `cargo xtask deb` builds the real
+  `winrdp-next_0.8.0_amd64.deb` package; no system installation was changed.
+- The final packaged X11/TCP smoke passes connection, rendering, keyboard, window
+  controls, clean disconnect and genuine-error reporting against an isolated
+  loopback server. RTT and bandwidth responses were observed. Dynamic desktop
+  resize on Windows remains unverified; the test server exercises reconnect fallback.
+- Website checks pass at 320, 390, 768 and 1,440 pixels, including image decoding,
+  no horizontal overflow and the latest GitHub release link.
+- Earlier focused protocol checks also cover the responder's `no_std` build and
+  compilation of its fuzz target. No sustained fuzz campaign was run.
 
-- **Numpad Enter, numpad `/` and the Menu key send wrong scancodes on Linux.**
-  They reach the host as undefined make codes, so the keypress is lost or lands on
-  another key. Upstream fixed this in `a59b609e` (`crates/ironrdp-viewer/src/keymap.rs`
-  plus its call site); the fork predates it and `session/src/app.rs` carries the same
-  fallback to raw evdev codes. Cherry-pick, port the table into `session/src/app.rs`,
-  and assert `NumpadEnter -> (extended, 0x1C)` and `NumpadDivide -> (extended, 0x35)`.
-- **Print jobs are spooled to a predictable path in shared `/tmp`**
-  (`crates/ironrdp-rdpdr-native/src/nix/printer.rs`). On a multi-user host any local
-  account can read a document while it prints, or pre-create a symlink there. Create
-  the spool with `create_new(true).mode(0o600)` inside a per-session `0700` directory,
-  or under `$XDG_RUNTIME_DIR`.
-- **`#[must_use]` and the doc comment on `drain_output` were detached** by an inserted
-  `output_size` (`crates/ironrdp-egfx/src/client.rs`). Ignoring `drain_output`'s return
-  value permanently drops frame regions, which is why upstream marked it. Move
-  `output_size` below it and restore the attribute.
-- **Per-second diagnostics ship enabled.** `driver.rs` logs tunnel stats and datagram
-  hex dumps every second at `info!`/`debug!`, roughly 2 MB an hour per session, and
-  nothing prunes `session-*.log`. Gate them behind `trace!`, drop
-  `ironrdp_rdpeudp_tokio=debug` from the launcher's default `IRONRDP_LOG`, and prune
-  old session logs at launcher start.
-- **`cargo xtask check lints` is red on the fork**, at 18 sites, so a PR from this
-  branch fails upstream CI before review and a rebase onto upstream master would have
-  to discard the fork's `connection.rs` almost entirely (upstream's merged #1919 is
-  now authoritative). Worth doing before any further upstream contribution.
-- **Upstreamable, in this order:** the RFX progressive SRL decoder leniency fix
-  (`ironrdp-graphics/src/srl.rs`, well tested — delete the two now-dead error variants
-  and the always-false branch first), the Soft-Sync tunnel DVC lifecycle and
-  EGFX-over-tunnel fixes, then the auto-detect responder. All three are blocked on
-  removing the `IRONRDP_UDP` / `IRONRDP_EGFX` / `IRONRDP_UDP_OFFER` environment
-  switches in favour of connector config, which upstream will require.
+## Remaining product and validation limits
 
-## Still open here
+- Native Wayland presentation/clipboard, Windows-host network measurement and
+  resize behavior, live image clipboard transfer, microphone/printer/audio,
+  clean-distribution installation and lossy/high-latency UDP comparisons still
+  need validation. Linux file clipboard transfer remains unsupported.
+- The iced launcher has no accessibility tree for screen readers. The retained
+  `compatibility`, `graphics`, `keyboardLayout` and `allMonitors` profile fields
+  round-trip older libraries but do not configure the session.
+- Saving with 0.7.6 or later drops retired preferences; opening that library in
+  0.7.5 is not supported. Preserve a backup before downgrading.
+- A new demonstration capture is still needed for the session screenshot and its
+  website copy. Upstream submission of the fork's protocol changes is separate
+  work, including replacing environment switches with connector configuration.
 
-- **Re-capture `docs/screenshots/session-window.png` against a demonstration
-  Windows profile.** The published image was a real desktop; the account name is now
-  replaced with a generic one and the taskbar cropped away, but a clean capture is
-  better than a redacted one. `website/public/assets/session.png` is the same file.
-- **Four per-computer settings can never be set and are ignored:** `compatibility`,
-  `graphics`, `keyboardLayout` and `allMonitors` (`frontend/app.js`). They are saved
-  into every library and read by nothing on the IronRDP path — the keyboard layout is
-  pinned to `0x409`. Either honour them or drop them from the stored shape.
-- **A library saved by 0.7.6 or later cannot be read back by 0.7.5.** `bootstrap`
-  fails and the whole startup path stops at a toast. Either note the one-way step or
-  keep serializing the retired field for one more release.
-- **`tests/launcher_checks.mjs` needs Playwright.** It now exits non-zero when run
-  without a browser instead of looking like a pass, and covers 29 checks including the
-  refusal path, but no workflow runs it: add `playwright` as a dev dependency and a CI
-  step, or state that it is manual.
-- **Validation gaps carried forward** (see `docs/RELEASE-VALIDATION.md`): native
-  Wayland clipboard, live image and file clipboard transfer, microphone, printer and
-  remote audio, clean-distribution installation, and a UDP-against-TCP comparison on a
-  lossy or high-latency link.
-- **Bandwidth-measure auto-detect PDUs are answered with nothing**
-  (`ironrdp-session/src/x224/mod.rs`, "not yet implemented"). On one cold connection
-  the server spent about 14 s and 20 MB on repeated network auto-detect that produced
-  no decoded frames. It did not recur on later connections, so the cause is unproven
-  and no change was made; implementing MS-RDPBCGR 2.2.14.2.2 would rule it out.
+## Prior owner follow-ups, not rechecked in this integration
+
+- Rotate the test credential previously recorded in the private repository's
+  handoff document; no credential value belongs in this repository.
+- Remove or redirect the stale `winrdp.openfuel-monorepo.workers.dev` deployment,
+  which the earlier audit found still linked to the private repository.
