@@ -84,7 +84,7 @@ so the behaviour could not be reproduced on demand and no change was made.
 The native Rust launcher, shared framebuffer, session-module cleanup and shared
 network-autodetection responder are being integrated. The results below were
 completed on the protocol branch at fork commit
-`deea1ad7de4a7c9c8f9b90ecba16e4e0d73eb717`; they do not certify the final combined
+`df5cdd417de708e6b9f57b3efb2f42ab2e5fdaac`; they do not certify the final combined
 build. No live Windows host or existing user session was used for these checks.
 The earlier observation that only RTT requests receive responses is superseded
 by this implementation; its relationship to the historical cold-connection delay
@@ -116,7 +116,7 @@ transfer is unsupported. A lossy/high-latency UDP comparison is also still open.
 ## Combined 0.8.0 verification — 2026-09-26
 
 The combined application uses IronRDP revision
-`0427e483817711feed7a271082e6afb0fe86c1e2`. The following checks ran after the
+`bc4759e2e1245e0d7ebcaf3b7a3f76d7c161a741`. The following checks ran after the
 launcher, renderer, autodetection and static-analysis changes were integrated.
 
 | Check | Result |
@@ -192,4 +192,8 @@ unverified, for those four distributions; no desktop session was started in them
 
 The maintainer installed the 0.8.0 build from the same source on their desktop and
 connected to their Windows computers before publication.
+
+On 2026-09-27 the history of this repository and of the fork's `winrdp` branch was
+rewritten to remove commit-message attribution trailers. Trees are unchanged; the
+IronRDP commit hashes quoted above are the rewritten ones.
 
