@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <title>Win RDP</title>
+  <defs>
+    <linearGradient id="front" x1="0" y1="56" x2="0" y2="200" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#5eead4"/>
+      <stop offset="1" stop-color="#14b8a6"/>
+    </linearGradient>
+    <linearGradient id="back" x1="0" y1="200" x2="0" y2="56" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0f766e"/>
+      <stop offset="1" stop-color="#115e59"/>
+    </linearGradient>
+  </defs>
+  <!-- One ribbon folded into a W: back faces first, front faces over them -->
+  <path d="M68 200h40l40-96h-40zM148 200h40l40-144h-40z" fill="url(#back)"/>
+  <path d="M28 56h40l40 144H68zM108 104h40l40 96h-40z" fill="url(#front)"/>
+</svg>

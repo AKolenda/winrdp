@@ -21,7 +21,13 @@ const PREVIEW_FONT: &str = "DejaVu Sans";
 
 pub fn run(root: &Path) -> Result<()> {
     let masters = root.join("docs/branding");
-    for copy in ["launcher/assets/winrdp.svg", "website/public/assets/winrdp.svg"] {
+    // favicon.svg at the repository root is the project icon for editors and tools
+    // that look for one there.
+    for copy in [
+        "launcher/assets/winrdp.svg",
+        "website/public/assets/winrdp.svg",
+        "favicon.svg",
+    ] {
         fs::copy(masters.join("logo.svg"), root.join(copy)).with_context(|| format!("Could not write {copy}"))?;
         println!("  {copy}");
     }
