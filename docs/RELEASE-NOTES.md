@@ -29,9 +29,11 @@ available.
   each of them.
 
 Validation and remaining limits are recorded in [RELEASE-VALIDATION.md](RELEASE-VALIDATION.md).
-The rendering measurements use a local synthetic TCP server, not a Windows benchmark.
-Native Wayland presentation, live Windows network-measurement behavior, redirected
-microphone/printer/audio and clean-distribution installation still require validation.
+The maintainer connected this build to Windows before release. The rendering measurements
+use a local synthetic TCP server, not a Windows benchmark. The launcher and session were
+also run as native Wayland clients under Weston; GNOME Shell's Wayland session, live
+Windows network-measurement behavior and redirected microphone/printer/audio still
+require validation.
 The iced launcher does not yet expose an accessibility tree for screen readers.
 
 # Win RDP 0.7.7

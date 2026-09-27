@@ -178,3 +178,18 @@ data-control protocol and no X11 fallback there.
 
 Not covered: GNOME Shell's own Wayland compositor, and any Windows host. This build
 has not yet been connected to a Windows computer.
+
+### Release package — 2026-09-27
+
+The published package was built by the **Prepare draft release** workflow from tag
+`v0.8.0` in an Ubuntu 22.04 container
+(`c3cdcc202ee4d9e7f584748b33c06bfb4bae976a00a4de2ce1c7f404219ce805`). Its Depends ask for
+glibc 2.35 and `libasound2` instead of the 24.04 build's glibc 2.39 and
+`libasound2t64`. The same workflow installed it with apt on clean Ubuntu 22.04, Ubuntu
+24.04, Debian 12 and Debian 13 containers and started both programs (`--version`); all
+four passed. This replaces the earlier note that clean-distribution installation was
+unverified, for those four distributions; no desktop session was started in them.
+
+The maintainer installed the 0.8.0 build from the same source on their desktop and
+connected to their Windows computers before publication.
+
