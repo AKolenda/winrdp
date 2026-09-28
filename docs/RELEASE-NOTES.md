@@ -1,3 +1,26 @@
+# Win RDP 0.8.1
+
+- The launcher switches between the compact window and the full workspace from an arrows
+  button at the top right, beside Settings in the compact window and beside Minimize in the
+  full one. Settings still offers the same choice.
+- Switching to the full layout on Wayland left a 480 × 600 window; each layout now opens
+  a window of its own size.
+- **Remember this password** in the sign-in dialog keeps the password in the desktop's
+  keyring (GNOME Keyring or KWallet), never in Win RDP's files. A remembered password
+  connects without asking. It is forgotten when Windows refuses it, when the computer's
+  address or account changes, when the computer is removed, and from Forget in Edit.
+- Each computer can keep a fixed **Resolution**, from 1280 × 720 to 3840 × 2160. The
+  desktop then stays that size when the window is resized or full screen, scaled to fit
+  with black bars, and the pointer is mapped through the same scaling. Match the window
+  remains the default.
+- A library without a fixed resolution is written as before, so 0.8.0 still reads it.
+- A performance page compares memory, CPU, resize and keypress timings with Remmina:
+  [PERFORMANCE.md](PERFORMANCE.md).
+
+The fixed resolution was checked on a Windows 11 PC in a window and full screen under
+Weston, and the keyring code against an isolated GNOME Keyring. GNOME Shell's own Wayland
+session and KWallet were not tested.
+
 # Win RDP 0.8.0
 
 The launcher is now a native Rust window built with iced. The application and its
