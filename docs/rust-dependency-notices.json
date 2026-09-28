@@ -8,7 +8,7 @@
     "License expressions and collected notices have not been independently audited for legal completeness.",
     "Upstream source download URLs and Cargo registry checksums identify exact crate archives; an offline vendor-source archive is not included."
   ],
-  "package_count": 530,
+  "package_count": 566,
   "missing_license_text": [],
   "packages": [
     {
@@ -142,6 +142,33 @@
         {
           "path": "licenses/rust/aead-0.6.1/LICENSE-MIT",
           "sha256": "33b32a251d445c5c03a634e64c53314c55540fc367fabdd45d9b6c8f260c028c"
+        }
+      ],
+      "inherits_ironrdp_licenses": false,
+      "status": "collected"
+    },
+    {
+      "name": "aes",
+      "version": "0.8.4",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "download_url": "https://crates.io/api/v1/crates/aes/0.8.4/download",
+      "registry_checksum": "b169f7a6d4742236a0a00c541b845991d0ac43e546831af1249753ab4c3aa3a0",
+      "license_expression": "MIT OR Apache-2.0",
+      "repository": "https://github.com/RustCrypto/block-ciphers",
+      "used_by": [
+        "launcher"
+      ],
+      "features": [
+        "zeroize"
+      ],
+      "notice_files": [
+        {
+          "path": "licenses/rust/aes-0.8.4/LICENSE-APACHE",
+          "sha256": "a9040321c3712d8fd0b09cf52b17445de04a23a10165049ae187cd39e5c86be5"
+        },
+        {
+          "path": "licenses/rust/aes-0.8.4/LICENSE-MIT",
+          "sha256": "f7e8ab639afef15573680c97f796166835cbeb3865175882fea41c60d106b733"
         }
       ],
       "inherits_ironrdp_licenses": false,
@@ -559,6 +586,30 @@
       "status": "collected"
     },
     {
+      "name": "ashpd",
+      "version": "0.13.13",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "download_url": "https://crates.io/api/v1/crates/ashpd/0.13.13/download",
+      "registry_checksum": "fb8421aaa9644a5faf26735f258b669b15f063313ef8f8e2bdb28912a1a6f111",
+      "license_expression": "MIT",
+      "repository": "https://github.com/bilelmoussaoui/ashpd",
+      "used_by": [
+        "launcher"
+      ],
+      "features": [
+        "secret",
+        "tokio"
+      ],
+      "notice_files": [
+        {
+          "path": "licenses/rust/ashpd-0.13.13/LICENSE",
+          "sha256": "ae26bc7b1bc91fb8648f6a298decbb1a77090a56c9d04e2c23b8365e5f54acb5"
+        }
+      ],
+      "inherits_ironrdp_licenses": false,
+      "status": "collected"
+    },
+    {
       "name": "asn1-rs",
       "version": "0.7.2",
       "source": "registry+https://github.com/rust-lang/crates.io-index",
@@ -655,6 +706,31 @@
       }
     },
     {
+      "name": "async-broadcast",
+      "version": "0.7.2",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "download_url": "https://crates.io/api/v1/crates/async-broadcast/0.7.2/download",
+      "registry_checksum": "435a87a52755b8f27fcf321ac4f04b2802e337c8c4872923137471ec39c37532",
+      "license_expression": "MIT OR Apache-2.0",
+      "repository": "https://github.com/smol-rs/async-broadcast",
+      "used_by": [
+        "launcher"
+      ],
+      "features": [],
+      "notice_files": [
+        {
+          "path": "licenses/rust/async-broadcast-0.7.2/LICENSE-APACHE",
+          "sha256": "e4705ddab847449a2cdcb3c88b005ea10330aa249d9148ca2eef9c84c5d29895"
+        },
+        {
+          "path": "licenses/rust/async-broadcast-0.7.2/LICENSE-MIT",
+          "sha256": "24e5860bf589d8501643e6ea51ffb3df66db2867492b09033d486183efbfa970"
+        }
+      ],
+      "inherits_ironrdp_licenses": false,
+      "status": "collected"
+    },
+    {
       "name": "async-recursion",
       "version": "1.1.1",
       "source": "registry+https://github.com/rust-lang/crates.io-index",
@@ -663,6 +739,7 @@
       "license_expression": "MIT OR Apache-2.0",
       "repository": "https://github.com/dcchut/async-recursion",
       "used_by": [
+        "launcher",
         "session"
       ],
       "features": [],
@@ -688,6 +765,7 @@
       "license_expression": "MIT OR Apache-2.0",
       "repository": "https://github.com/dtolnay/async-trait",
       "used_by": [
+        "launcher",
         "session"
       ],
       "features": [],
@@ -1013,6 +1091,7 @@
       "license_expression": "MIT OR Apache-2.0",
       "repository": "https://github.com/RustCrypto/utils",
       "used_by": [
+        "launcher",
         "session"
       ],
       "features": [],
@@ -1049,6 +1128,31 @@
         {
           "path": "licenses/rust/block-buffer-0.12.1/LICENSE-MIT",
           "sha256": "98181e7249d0c01737645ec982499ce99a0f07eb8f7d625b8840d799d10dbc01"
+        }
+      ],
+      "inherits_ironrdp_licenses": false,
+      "status": "collected"
+    },
+    {
+      "name": "block-padding",
+      "version": "0.3.3",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "download_url": "https://crates.io/api/v1/crates/block-padding/0.3.3/download",
+      "registry_checksum": "a8894febbff9f758034a5b8e12d87918f56dfc64a8e1fe757d65e29041538d93",
+      "license_expression": "MIT OR Apache-2.0",
+      "repository": "https://github.com/RustCrypto/utils",
+      "used_by": [
+        "launcher"
+      ],
+      "features": [],
+      "notice_files": [
+        {
+          "path": "licenses/rust/block-padding-0.3.3/LICENSE-APACHE",
+          "sha256": "a9040321c3712d8fd0b09cf52b17445de04a23a10165049ae187cd39e5c86be5"
+        },
+        {
+          "path": "licenses/rust/block-padding-0.3.3/LICENSE-MIT",
+          "sha256": "d5c22aa3118d240e877ad41c5d9fa232f9c77d757d4aac0c2f943afc0a95e0ef"
         }
       ],
       "inherits_ironrdp_licenses": false,
@@ -1319,6 +1423,35 @@
     },
     {
       "name": "cbc",
+      "version": "0.1.2",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "download_url": "https://crates.io/api/v1/crates/cbc/0.1.2/download",
+      "registry_checksum": "26b52a9543ae338f279b96b0b9fed9c8093744685043739079ce85cd58f289a6",
+      "license_expression": "MIT OR Apache-2.0",
+      "repository": "https://github.com/RustCrypto/block-modes",
+      "used_by": [
+        "launcher"
+      ],
+      "features": [
+        "block-padding",
+        "default",
+        "zeroize"
+      ],
+      "notice_files": [
+        {
+          "path": "licenses/rust/cbc-0.1.2/LICENSE-APACHE",
+          "sha256": "a9040321c3712d8fd0b09cf52b17445de04a23a10165049ae187cd39e5c86be5"
+        },
+        {
+          "path": "licenses/rust/cbc-0.1.2/LICENSE-MIT",
+          "sha256": "63af4bea227c94d021e99427f6ca3a4b8efddadcca93ab6130f708cf6138cf68"
+        }
+      ],
+      "inherits_ironrdp_licenses": false,
+      "status": "collected"
+    },
+    {
+      "name": "cbc",
       "version": "0.2.1",
       "source": "registry+https://github.com/rust-lang/crates.io-index",
       "download_url": "https://crates.io/api/v1/crates/cbc/0.2.1/download",
@@ -1448,6 +1581,34 @@
         {
           "path": "licenses/rust/chacha20-0.10.2/LICENSE-MIT",
           "sha256": "b8c6939380a400f53e11923d50fcc4dd2fa1ba8339fd9d04cda38a0251b6c9b0"
+        }
+      ],
+      "inherits_ironrdp_licenses": false,
+      "status": "collected"
+    },
+    {
+      "name": "cipher",
+      "version": "0.4.4",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "download_url": "https://crates.io/api/v1/crates/cipher/0.4.4/download",
+      "registry_checksum": "773f3b9af64447d2ce9850330c473515014aa235e6a783b02db81ff39e4a3dad",
+      "license_expression": "MIT OR Apache-2.0",
+      "repository": "https://github.com/RustCrypto/traits",
+      "used_by": [
+        "launcher"
+      ],
+      "features": [
+        "block-padding",
+        "zeroize"
+      ],
+      "notice_files": [
+        {
+          "path": "licenses/rust/cipher-0.4.4/LICENSE-APACHE",
+          "sha256": "a9040321c3712d8fd0b09cf52b17445de04a23a10165049ae187cd39e5c86be5"
+        },
+        {
+          "path": "licenses/rust/cipher-0.4.4/LICENSE-MIT",
+          "sha256": "5c7bd92d1f096f12203dc1b601e3cb17484fa1b023e30b6b8edcc80e416237ec"
         }
       ],
       "inherits_ironrdp_licenses": false,
@@ -1923,6 +2084,7 @@
       "license_expression": "MIT OR Apache-2.0",
       "repository": "https://github.com/RustCrypto/utils",
       "used_by": [
+        "launcher",
         "session"
       ],
       "features": [],
@@ -2087,6 +2249,7 @@
       "license_expression": "MIT OR Apache-2.0",
       "repository": "https://github.com/RustCrypto/traits",
       "used_by": [
+        "launcher",
         "session"
       ],
       "features": [
@@ -2722,6 +2885,7 @@
       "license_expression": "MIT OR Apache-2.0",
       "repository": "https://github.com/RustCrypto/traits",
       "used_by": [
+        "launcher",
         "session"
       ],
       "features": [
@@ -3216,6 +3380,82 @@
       "status": "collected"
     },
     {
+      "name": "endi",
+      "version": "1.1.1",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "download_url": "https://crates.io/api/v1/crates/endi/1.1.1/download",
+      "registry_checksum": "66b7e2430c6dff6a955451e2cfc438f09cea1965a9d6f87f7e3b90decc014099",
+      "license_expression": "MIT",
+      "repository": "https://github.com/zeenix/endi",
+      "used_by": [
+        "launcher"
+      ],
+      "features": [
+        "default",
+        "std"
+      ],
+      "notice_files": [
+        {
+          "path": "licenses/rust/endi-1.1.1/LICENSE-MIT",
+          "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3"
+        }
+      ],
+      "inherits_ironrdp_licenses": false,
+      "status": "collected"
+    },
+    {
+      "name": "enumflags2",
+      "version": "0.7.12",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "download_url": "https://crates.io/api/v1/crates/enumflags2/0.7.12/download",
+      "registry_checksum": "1027f7680c853e056ebcec683615fb6fbbc07dbaa13b4d5d9442b146ded4ecef",
+      "license_expression": "MIT OR Apache-2.0",
+      "repository": "https://github.com/meithecatte/enumflags2",
+      "used_by": [
+        "launcher"
+      ],
+      "features": [
+        "serde"
+      ],
+      "notice_files": [
+        {
+          "path": "licenses/rust/enumflags2-0.7.12/LICENSE-APACHE",
+          "sha256": "41ba8a366e4129d0b7551f8b98211f59635b2e30c0a3c7845e828e2a7ce42064"
+        },
+        {
+          "path": "licenses/rust/enumflags2-0.7.12/LICENSE-MIT",
+          "sha256": "2e3edd2716fb15616e867bd53f724f0906732242e9ae76bb1faad1d88f7eeebd"
+        }
+      ],
+      "inherits_ironrdp_licenses": false,
+      "status": "collected"
+    },
+    {
+      "name": "enumflags2_derive",
+      "version": "0.7.12",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "download_url": "https://crates.io/api/v1/crates/enumflags2_derive/0.7.12/download",
+      "registry_checksum": "67c78a4d8fdf9953a5c9d458f9efe940fd97a0cab0941c075a813ac594733827",
+      "license_expression": "MIT OR Apache-2.0",
+      "repository": "https://github.com/meithecatte/enumflags2",
+      "used_by": [
+        "launcher"
+      ],
+      "features": [],
+      "notice_files": [
+        {
+          "path": "licenses/rust/enumflags2_derive-0.7.12/LICENSE-APACHE",
+          "sha256": "68d7c3ae5b131ec533fb33a9fd63753eb82fac77d7597bb5058a5af07adf9f06"
+        },
+        {
+          "path": "licenses/rust/enumflags2_derive-0.7.12/LICENSE-MIT",
+          "sha256": "d13669f0eaff9b7015bff0d8637297213b53d9f239826636c07a15633acf7052"
+        }
+      ],
+      "inherits_ironrdp_licenses": false,
+      "status": "collected"
+    },
+    {
       "name": "equivalent",
       "version": "1.0.2",
       "source": "registry+https://github.com/rust-lang/crates.io-index",
@@ -3224,6 +3464,7 @@
       "license_expression": "Apache-2.0 OR MIT",
       "repository": "https://github.com/indexmap-rs/equivalent",
       "used_by": [
+        "launcher",
         "session"
       ],
       "features": [],
@@ -3249,6 +3490,7 @@
       "license_expression": "MIT OR Apache-2.0",
       "repository": "https://github.com/lambda-fairy/rust-errno",
       "used_by": [
+        "launcher",
         "session"
       ],
       "features": [
@@ -3263,6 +3505,63 @@
         {
           "path": "licenses/rust/errno-0.3.14/LICENSE-MIT",
           "sha256": "8764a597675778ddfd4e25f81b08a05dbcf089ac05662df7613fe67f150e3aa2"
+        }
+      ],
+      "inherits_ironrdp_licenses": false,
+      "status": "collected"
+    },
+    {
+      "name": "event-listener",
+      "version": "5.4.2",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "download_url": "https://crates.io/api/v1/crates/event-listener/5.4.2/download",
+      "registry_checksum": "5a23add41df1562121a9393cb065eab5146a1242410f23a644851e90cfd669d2",
+      "license_expression": "Apache-2.0 OR MIT",
+      "repository": "https://github.com/smol-rs/event-listener",
+      "used_by": [
+        "launcher"
+      ],
+      "features": [
+        "default",
+        "parking",
+        "std"
+      ],
+      "notice_files": [
+        {
+          "path": "licenses/rust/event-listener-5.4.2/LICENSE-APACHE",
+          "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2"
+        },
+        {
+          "path": "licenses/rust/event-listener-5.4.2/LICENSE-MIT",
+          "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3"
+        }
+      ],
+      "inherits_ironrdp_licenses": false,
+      "status": "collected"
+    },
+    {
+      "name": "event-listener-strategy",
+      "version": "0.5.4",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "download_url": "https://crates.io/api/v1/crates/event-listener-strategy/0.5.4/download",
+      "registry_checksum": "8be9f3dfaaffdae2972880079a491a1a8bb7cbed0b8dd7a347f668b4150a3b93",
+      "license_expression": "Apache-2.0 OR MIT",
+      "repository": "https://github.com/smol-rs/event-listener-strategy",
+      "used_by": [
+        "launcher"
+      ],
+      "features": [
+        "default",
+        "std"
+      ],
+      "notice_files": [
+        {
+          "path": "licenses/rust/event-listener-strategy-0.5.4/LICENSE-APACHE",
+          "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2"
+        },
+        {
+          "path": "licenses/rust/event-listener-strategy-0.5.4/LICENSE-MIT",
+          "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3"
         }
       ],
       "inherits_ironrdp_licenses": false,
@@ -3815,6 +4114,7 @@
         "session"
       ],
       "features": [
+        "default",
         "std"
       ],
       "notice_files": [
@@ -3825,6 +4125,41 @@
         {
           "path": "licenses/rust/futures-io-0.3.34/LICENSE-MIT",
           "sha256": "6652c868f35dfe5e8ef636810a4e576b9d663f3a17fb0f5613ad73583e1b88fd"
+        }
+      ],
+      "inherits_ironrdp_licenses": false,
+      "status": "collected"
+    },
+    {
+      "name": "futures-lite",
+      "version": "2.6.1",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "download_url": "https://crates.io/api/v1/crates/futures-lite/2.6.1/download",
+      "registry_checksum": "f78e10609fe0e0b3f4157ffab1876319b5b0db102a2c60dc4626306dc46b44ad",
+      "license_expression": "Apache-2.0 OR MIT",
+      "repository": "https://github.com/smol-rs/futures-lite",
+      "used_by": [
+        "launcher"
+      ],
+      "features": [
+        "alloc",
+        "fastrand",
+        "futures-io",
+        "parking",
+        "std"
+      ],
+      "notice_files": [
+        {
+          "path": "licenses/rust/futures-lite-2.6.1/LICENSE-APACHE",
+          "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2"
+        },
+        {
+          "path": "licenses/rust/futures-lite-2.6.1/LICENSE-MIT",
+          "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3"
+        },
+        {
+          "path": "licenses/rust/futures-lite-2.6.1/LICENSE-THIRD-PARTY",
+          "sha256": "6226d0632e2e1a80c23597e964da9812ae193c535fe058154afb034e94167aa5"
         }
       ],
       "inherits_ironrdp_licenses": false,
@@ -3986,6 +4321,7 @@
       "license_expression": "MIT",
       "repository": "https://github.com/fizyk20/generic-array.git",
       "used_by": [
+        "launcher",
         "session"
       ],
       "features": [
@@ -4359,6 +4695,7 @@
       "license_expression": "MIT OR Apache-2.0",
       "repository": "https://github.com/rust-lang/hashbrown",
       "used_by": [
+        "launcher",
         "session"
       ],
       "features": [],
@@ -4438,6 +4775,7 @@
       "license_expression": "MIT OR Apache-2.0",
       "repository": "https://github.com/KokaKiwi/rust-hex",
       "used_by": [
+        "launcher",
         "session"
       ],
       "features": [
@@ -4453,6 +4791,31 @@
         {
           "path": "licenses/rust/hex-0.4.3/LICENSE-MIT",
           "sha256": "f7bdb3426d045cd50efd4953026e3eb5a83d0199f458a075602611b9344da5b9"
+        }
+      ],
+      "inherits_ironrdp_licenses": false,
+      "status": "collected"
+    },
+    {
+      "name": "hkdf",
+      "version": "0.12.4",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "download_url": "https://crates.io/api/v1/crates/hkdf/0.12.4/download",
+      "registry_checksum": "7b5f8eb2ad728638ea2c7d47a21db23b7b58a72ed6a38256b8a1849f15fbbdf7",
+      "license_expression": "MIT OR Apache-2.0",
+      "repository": "https://github.com/RustCrypto/KDFs/",
+      "used_by": [
+        "launcher"
+      ],
+      "features": [],
+      "notice_files": [
+        {
+          "path": "licenses/rust/hkdf-0.12.4/LICENSE-APACHE",
+          "sha256": "59013a5c8d3a19c26a457579105915a5d51bb0c09d579f8cdedf12e4203c3018"
+        },
+        {
+          "path": "licenses/rust/hkdf-0.12.4/LICENSE-MIT",
+          "sha256": "d288f9c9b4590446ec18c22ead8f8b5a12a3d4025b68f62dc9015063eb9cca69"
         }
       ],
       "inherits_ironrdp_licenses": false,
@@ -4492,6 +4855,7 @@
       "license_expression": "MIT OR Apache-2.0",
       "repository": "https://github.com/RustCrypto/MACs",
       "used_by": [
+        "launcher",
         "session"
       ],
       "features": [],
@@ -5436,6 +5800,7 @@
       "license_expression": "Apache-2.0 OR MIT",
       "repository": "https://github.com/indexmap-rs/indexmap",
       "used_by": [
+        "launcher",
         "session"
       ],
       "features": [
@@ -5450,6 +5815,33 @@
         {
           "path": "licenses/rust/indexmap-2.14.2/LICENSE-MIT",
           "sha256": "ecc269ef87fd38a1d98e30bfac9ba964a9dbd9315c3770fed98d4d7cb5882055"
+        }
+      ],
+      "inherits_ironrdp_licenses": false,
+      "status": "collected"
+    },
+    {
+      "name": "inout",
+      "version": "0.1.4",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "download_url": "https://crates.io/api/v1/crates/inout/0.1.4/download",
+      "registry_checksum": "879f10e63c20629ecabbb64a8010319738c66a5cd0c29b02d63d272b03751d01",
+      "license_expression": "MIT OR Apache-2.0",
+      "repository": "https://github.com/RustCrypto/utils",
+      "used_by": [
+        "launcher"
+      ],
+      "features": [
+        "block-padding"
+      ],
+      "notice_files": [
+        {
+          "path": "licenses/rust/inout-0.1.4/LICENSE-APACHE",
+          "sha256": "a9040321c3712d8fd0b09cf52b17445de04a23a10165049ae187cd39e5c86be5"
+        },
+        {
+          "path": "licenses/rust/inout-0.1.4/LICENSE-MIT",
+          "sha256": "304b898acad7f02e03d6d8832d682a3b43ee729ab5d3a069af5a36979083b6b4"
         }
       ],
       "inherits_ironrdp_licenses": false,
@@ -7436,6 +7828,7 @@
       "license_expression": "MIT OR Apache-2.0",
       "repository": "https://github.com/RustCrypto/hashes",
       "used_by": [
+        "launcher",
         "session"
       ],
       "features": [
@@ -7690,6 +8083,7 @@
       "license_expression": "MIT",
       "repository": "https://github.com/tokio-rs/mio",
       "used_by": [
+        "launcher",
         "session"
       ],
       "features": [
@@ -7938,6 +8332,35 @@
       "status": "collected"
     },
     {
+      "name": "num",
+      "version": "0.4.3",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "download_url": "https://crates.io/api/v1/crates/num/0.4.3/download",
+      "registry_checksum": "35bd024e8b2ff75562e5f34e7f4905839deb4b22955ef5e73d2fea1b9813cb23",
+      "license_expression": "MIT OR Apache-2.0",
+      "repository": "https://github.com/rust-num/num",
+      "used_by": [
+        "launcher"
+      ],
+      "features": [
+        "default",
+        "num-bigint",
+        "std"
+      ],
+      "notice_files": [
+        {
+          "path": "licenses/rust/num-0.4.3/LICENSE-APACHE",
+          "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2"
+        },
+        {
+          "path": "licenses/rust/num-0.4.3/LICENSE-MIT",
+          "sha256": "6485b8ed310d3f0340bf1ad1f47645069ce4069dcc6bb46c7d5c6faf41de1fdb"
+        }
+      ],
+      "inherits_ironrdp_licenses": false,
+      "status": "collected"
+    },
+    {
       "name": "num-bigint",
       "version": "0.3.3",
       "source": "registry+https://github.com/rust-lang/crates.io-index",
@@ -7974,6 +8397,7 @@
       "license_expression": "MIT OR Apache-2.0",
       "repository": "https://github.com/rust-num/num-bigint",
       "used_by": [
+        "launcher",
         "session"
       ],
       "features": [
@@ -7987,6 +8411,65 @@
         },
         {
           "path": "licenses/rust/num-bigint-0.4.8/LICENSE-MIT",
+          "sha256": "6485b8ed310d3f0340bf1ad1f47645069ce4069dcc6bb46c7d5c6faf41de1fdb"
+        }
+      ],
+      "inherits_ironrdp_licenses": false,
+      "status": "collected"
+    },
+    {
+      "name": "num-bigint-dig",
+      "version": "0.9.1",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "download_url": "https://crates.io/api/v1/crates/num-bigint-dig/0.9.1/download",
+      "registry_checksum": "a7f9a86e097b0d187ad0e65667c2f58b9254671e86e7dbb78036b16692eae099",
+      "license_expression": "MIT/Apache-2.0",
+      "repository": "https://github.com/dignifiedquire/num-bigint",
+      "used_by": [
+        "launcher"
+      ],
+      "features": [
+        "default",
+        "rand",
+        "serde",
+        "std",
+        "u64_digit",
+        "zeroize"
+      ],
+      "notice_files": [
+        {
+          "path": "licenses/rust/num-bigint-dig-0.9.1/LICENSE-APACHE",
+          "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2"
+        },
+        {
+          "path": "licenses/rust/num-bigint-dig-0.9.1/LICENSE-MIT",
+          "sha256": "6485b8ed310d3f0340bf1ad1f47645069ce4069dcc6bb46c7d5c6faf41de1fdb"
+        }
+      ],
+      "inherits_ironrdp_licenses": false,
+      "status": "collected"
+    },
+    {
+      "name": "num-complex",
+      "version": "0.4.6",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "download_url": "https://crates.io/api/v1/crates/num-complex/0.4.6/download",
+      "registry_checksum": "73f88a1307638156682bada9d7604135552957b7818057dcef22705b4d509495",
+      "license_expression": "MIT OR Apache-2.0",
+      "repository": "https://github.com/rust-num/num-complex",
+      "used_by": [
+        "launcher"
+      ],
+      "features": [
+        "std"
+      ],
+      "notice_files": [
+        {
+          "path": "licenses/rust/num-complex-0.4.6/LICENSE-APACHE",
+          "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2"
+        },
+        {
+          "path": "licenses/rust/num-complex-0.4.6/LICENSE-MIT",
           "sha256": "6485b8ed310d3f0340bf1ad1f47645069ce4069dcc6bb46c7d5c6faf41de1fdb"
         }
       ],
@@ -8077,6 +8560,7 @@
       "license_expression": "MIT OR Apache-2.0",
       "repository": "https://github.com/rust-num/num-integer",
       "used_by": [
+        "launcher",
         "session"
       ],
       "features": [
@@ -8091,6 +8575,63 @@
         },
         {
           "path": "licenses/rust/num-integer-0.1.47/LICENSE-MIT",
+          "sha256": "6485b8ed310d3f0340bf1ad1f47645069ce4069dcc6bb46c7d5c6faf41de1fdb"
+        }
+      ],
+      "inherits_ironrdp_licenses": false,
+      "status": "collected"
+    },
+    {
+      "name": "num-iter",
+      "version": "0.1.46",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "download_url": "https://crates.io/api/v1/crates/num-iter/0.1.46/download",
+      "registry_checksum": "c92800bd69a1eac91786bcfe9da64a897eb72911b8dc3095decbd07429e8048b",
+      "license_expression": "MIT OR Apache-2.0",
+      "repository": "https://github.com/rust-num/num-iter",
+      "used_by": [
+        "launcher"
+      ],
+      "features": [
+        "i128",
+        "std"
+      ],
+      "notice_files": [
+        {
+          "path": "licenses/rust/num-iter-0.1.46/LICENSE-APACHE",
+          "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2"
+        },
+        {
+          "path": "licenses/rust/num-iter-0.1.46/LICENSE-MIT",
+          "sha256": "6485b8ed310d3f0340bf1ad1f47645069ce4069dcc6bb46c7d5c6faf41de1fdb"
+        }
+      ],
+      "inherits_ironrdp_licenses": false,
+      "status": "collected"
+    },
+    {
+      "name": "num-rational",
+      "version": "0.4.2",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "download_url": "https://crates.io/api/v1/crates/num-rational/0.4.2/download",
+      "registry_checksum": "f83d14da390562dca69fc84082e73e548e1ad308d24accdedd2720017cb37824",
+      "license_expression": "MIT OR Apache-2.0",
+      "repository": "https://github.com/rust-num/num-rational",
+      "used_by": [
+        "launcher"
+      ],
+      "features": [
+        "num-bigint",
+        "num-bigint-std",
+        "std"
+      ],
+      "notice_files": [
+        {
+          "path": "licenses/rust/num-rational-0.4.2/LICENSE-APACHE",
+          "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2"
+        },
+        {
+          "path": "licenses/rust/num-rational-0.4.2/LICENSE-MIT",
           "sha256": "6485b8ed310d3f0340bf1ad1f47645069ce4069dcc6bb46c7d5c6faf41de1fdb"
         }
       ],
@@ -8189,6 +8730,30 @@
       "status": "collected"
     },
     {
+      "name": "oo7",
+      "version": "0.6.0",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "download_url": "https://crates.io/api/v1/crates/oo7/0.6.0/download",
+      "registry_checksum": "78f2bfed90f1618b4b48dcad9307f25e14ae894e2949642c87c351601d62cebd",
+      "license_expression": "MIT",
+      "repository": "https://github.com/linux-credentials/oo7",
+      "used_by": [
+        "launcher"
+      ],
+      "features": [
+        "native_crypto",
+        "tokio"
+      ],
+      "notice_files": [
+        {
+          "path": "licenses/rust/oo7-0.6.0/LICENSE",
+          "sha256": "fb1def6675e300ebd48f65bbc6f57d874edee332abdb110d01a3a1924b20dc9c"
+        }
+      ],
+      "inherits_ironrdp_licenses": false,
+      "status": "collected"
+    },
+    {
       "name": "openssl-probe",
       "version": "0.2.1",
       "source": "registry+https://github.com/rust-lang/crates.io-index",
@@ -8238,6 +8803,31 @@
         {
           "path": "licenses/rust/opus2-0.4.0/LICENSE-MIT",
           "sha256": "6b3b465fa69075348ee5ffc9ba6afa93402743a4a942a463404fac25257bd3ed"
+        }
+      ],
+      "inherits_ironrdp_licenses": false,
+      "status": "collected"
+    },
+    {
+      "name": "ordered-stream",
+      "version": "0.2.0",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "download_url": "https://crates.io/api/v1/crates/ordered-stream/0.2.0/download",
+      "registry_checksum": "9aa2b01e1d916879f73a53d01d1d6cee68adbb31d6d9177a8cfce093cced1d50",
+      "license_expression": "MIT OR Apache-2.0",
+      "repository": "https://github.com/danieldg/ordered-stream",
+      "used_by": [
+        "launcher"
+      ],
+      "features": [],
+      "notice_files": [
+        {
+          "path": "licenses/rust/ordered-stream-0.2.0/LICENSE-APACHE",
+          "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2"
+        },
+        {
+          "path": "licenses/rust/ordered-stream-0.2.0/LICENSE-MIT",
+          "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3"
         }
       ],
       "inherits_ironrdp_licenses": false,
@@ -8416,6 +9006,35 @@
       "status": "collected"
     },
     {
+      "name": "parking",
+      "version": "2.2.1",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "download_url": "https://crates.io/api/v1/crates/parking/2.2.1/download",
+      "registry_checksum": "f38d5652c16fde515bb1ecef450ab0f6a219d619a7274976324d5e377f7dceba",
+      "license_expression": "Apache-2.0 OR MIT",
+      "repository": "https://github.com/smol-rs/parking",
+      "used_by": [
+        "launcher"
+      ],
+      "features": [],
+      "notice_files": [
+        {
+          "path": "licenses/rust/parking-2.2.1/LICENSE-APACHE",
+          "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2"
+        },
+        {
+          "path": "licenses/rust/parking-2.2.1/LICENSE-MIT",
+          "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3"
+        },
+        {
+          "path": "licenses/rust/parking-2.2.1/LICENSE-THIRD-PARTY",
+          "sha256": "9a6d7a3c1b8edcc706c4b6c37f8dae9a77f02c7f9051df603f975db136b55419"
+        }
+      ],
+      "inherits_ironrdp_licenses": false,
+      "status": "collected"
+    },
+    {
       "name": "parking_lot",
       "version": "0.12.5",
       "source": "registry+https://github.com/rust-lang/crates.io-index",
@@ -8462,6 +9081,34 @@
         {
           "path": "licenses/rust/parking_lot_core-0.9.12/LICENSE-MIT",
           "sha256": "c9a75f18b9ab2927829a208fc6aa2cf4e63b8420887ba29cdb265d6619ae82d5"
+        }
+      ],
+      "inherits_ironrdp_licenses": false,
+      "status": "collected"
+    },
+    {
+      "name": "pbkdf2",
+      "version": "0.12.2",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "download_url": "https://crates.io/api/v1/crates/pbkdf2/0.12.2/download",
+      "registry_checksum": "f8ed6a7761f76e3b9f92dfb0a60a6a6477c61024b775147ff0973a02653abaf2",
+      "license_expression": "MIT OR Apache-2.0",
+      "repository": "https://github.com/RustCrypto/password-hashes/tree/master/pbkdf2",
+      "used_by": [
+        "launcher"
+      ],
+      "features": [
+        "default",
+        "hmac"
+      ],
+      "notice_files": [
+        {
+          "path": "licenses/rust/pbkdf2-0.12.2/LICENSE-APACHE",
+          "sha256": "a9040321c3712d8fd0b09cf52b17445de04a23a10165049ae187cd39e5c86be5"
+        },
+        {
+          "path": "licenses/rust/pbkdf2-0.12.2/LICENSE-MIT",
+          "sha256": "8ea5cea8ddecc46a64a004406414d25529fca7eb71cfd8c0cfe49c343bff79c5"
         }
       ],
       "inherits_ironrdp_licenses": false,
@@ -9171,6 +9818,31 @@
       "status": "collected"
     },
     {
+      "name": "proc-macro-crate",
+      "version": "3.5.0",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "download_url": "https://crates.io/api/v1/crates/proc-macro-crate/3.5.0/download",
+      "registry_checksum": "e67ba7e9b2b56446f1d419b1d807906278ffa1a658a8a5d8a39dcb1f5a78614f",
+      "license_expression": "MIT OR Apache-2.0",
+      "repository": "https://github.com/bkchr/proc-macro-crate",
+      "used_by": [
+        "launcher"
+      ],
+      "features": [],
+      "notice_files": [
+        {
+          "path": "licenses/rust/proc-macro-crate-3.5.0/LICENSE-APACHE",
+          "sha256": "8ada45cd9f843acf64e4722ae262c622a2b3b3007c7310ef36ac1061a30f6adb"
+        },
+        {
+          "path": "licenses/rust/proc-macro-crate-3.5.0/LICENSE-MIT",
+          "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3"
+        }
+      ],
+      "inherits_ironrdp_licenses": false,
+      "status": "collected"
+    },
+    {
       "name": "proc-macro2",
       "version": "1.0.107",
       "source": "registry+https://github.com/rust-lang/crates.io-index",
@@ -9405,6 +10077,7 @@
       "license_expression": "MIT OR Apache-2.0",
       "repository": "https://github.com/rust-random/rand",
       "used_by": [
+        "launcher",
         "session"
       ],
       "features": [
@@ -9566,6 +10239,7 @@
       "license_expression": "MIT OR Apache-2.0",
       "repository": "https://github.com/rust-random/rand",
       "used_by": [
+        "launcher",
         "session"
       ],
       "features": [
@@ -10713,6 +11387,7 @@
         "session"
       ],
       "features": [
+        "alloc",
         "default",
         "derive",
         "serde_derive",
@@ -10740,6 +11415,7 @@
       "license_expression": "MIT OR Apache-2.0",
       "repository": "https://github.com/serde-rs/bytes",
       "used_by": [
+        "launcher",
         "session"
       ],
       "features": [
@@ -10772,6 +11448,7 @@
         "session"
       ],
       "features": [
+        "alloc",
         "result",
         "std"
       ],
@@ -10839,6 +11516,31 @@
         },
         {
           "path": "licenses/rust/serde_json-1.0.151/LICENSE-MIT",
+          "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3"
+        }
+      ],
+      "inherits_ironrdp_licenses": false,
+      "status": "collected"
+    },
+    {
+      "name": "serde_repr",
+      "version": "0.1.21",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "download_url": "https://crates.io/api/v1/crates/serde_repr/0.1.21/download",
+      "registry_checksum": "8d3b1629de253c70a0508c3899572da79ca359fdab27c7920ff00406df418906",
+      "license_expression": "MIT OR Apache-2.0",
+      "repository": "https://github.com/dtolnay/serde-repr",
+      "used_by": [
+        "launcher"
+      ],
+      "features": [],
+      "notice_files": [
+        {
+          "path": "licenses/rust/serde_repr-0.1.21/LICENSE-APACHE",
+          "sha256": "62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a"
+        },
+        {
+          "path": "licenses/rust/serde_repr-0.1.21/LICENSE-MIT",
           "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3"
         }
       ],
@@ -10936,6 +11638,7 @@
       "license_expression": "MIT OR Apache-2.0",
       "repository": "https://github.com/RustCrypto/hashes",
       "used_by": [
+        "launcher",
         "session"
       ],
       "features": [
@@ -11129,6 +11832,7 @@
       "license_expression": "MIT OR Apache-2.0",
       "repository": "https://github.com/vorner/signal-hook",
       "used_by": [
+        "launcher",
         "session"
       ],
       "features": [],
@@ -11375,7 +12079,8 @@
       "features": [
         "const_generics",
         "const_new",
-        "union"
+        "union",
+        "write"
       ],
       "notice_files": [
         {
@@ -11501,6 +12206,7 @@
       "license_expression": "MIT OR Apache-2.0",
       "repository": "https://github.com/rust-lang/socket2",
       "used_by": [
+        "launcher",
         "session"
       ],
       "features": [
@@ -11786,11 +12492,14 @@
       "license_expression": "BSD-3-Clause",
       "repository": "https://github.com/dalek-cryptography/subtle",
       "used_by": [
+        "launcher",
         "session"
       ],
       "features": [
         "const-generics",
-        "i128"
+        "default",
+        "i128",
+        "std"
       ],
       "notice_files": [
         {
@@ -11944,6 +12653,7 @@
         "default",
         "derive",
         "extra-traits",
+        "fold",
         "full",
         "parsing",
         "printing",
@@ -12419,7 +13129,8 @@
         "socket2",
         "sync",
         "time",
-        "tokio-macros"
+        "tokio-macros",
+        "tracing"
       ],
       "notice_files": [
         {
@@ -12557,6 +13268,91 @@
         {
           "path": "licenses/rust/tokio-util-0.7.19/LICENSE",
           "sha256": "253cd04c6714889df2d32f3f64d669179a1c95c76ac43c40882c52eb06bc3552"
+        }
+      ],
+      "inherits_ironrdp_licenses": false,
+      "status": "collected"
+    },
+    {
+      "name": "toml_datetime",
+      "version": "1.1.1+spec-1.1.0",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "download_url": "https://crates.io/api/v1/crates/toml_datetime/1.1.1+spec-1.1.0/download",
+      "registry_checksum": "3165f65f62e28e0115a00b2ebdd37eb6f3b641855f9d636d3cd4103767159ad7",
+      "license_expression": "MIT OR Apache-2.0",
+      "repository": "https://github.com/toml-rs/toml",
+      "used_by": [
+        "launcher"
+      ],
+      "features": [
+        "alloc",
+        "default",
+        "std"
+      ],
+      "notice_files": [
+        {
+          "path": "licenses/rust/toml_datetime-1.1.1+spec-1.1.0/LICENSE-APACHE",
+          "sha256": "c6596eb7be8581c18be736c846fb9173b69eccf6ef94c5135893ec56bd92ba08"
+        },
+        {
+          "path": "licenses/rust/toml_datetime-1.1.1+spec-1.1.0/LICENSE-MIT",
+          "sha256": "6efb0476a1cc085077ed49357026d8c173bf33017278ef440f222fb9cbcb66e6"
+        }
+      ],
+      "inherits_ironrdp_licenses": false,
+      "status": "collected"
+    },
+    {
+      "name": "toml_edit",
+      "version": "0.25.13+spec-1.1.0",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "download_url": "https://crates.io/api/v1/crates/toml_edit/0.25.13+spec-1.1.0/download",
+      "registry_checksum": "6975367e4d2ef766d86af01ffad14b622fecc8d4357a998fbc4deb6e9bacaf9b",
+      "license_expression": "MIT OR Apache-2.0",
+      "repository": "https://github.com/toml-rs/toml",
+      "used_by": [
+        "launcher"
+      ],
+      "features": [
+        "parse"
+      ],
+      "notice_files": [
+        {
+          "path": "licenses/rust/toml_edit-0.25.13+spec-1.1.0/LICENSE-APACHE",
+          "sha256": "c6596eb7be8581c18be736c846fb9173b69eccf6ef94c5135893ec56bd92ba08"
+        },
+        {
+          "path": "licenses/rust/toml_edit-0.25.13+spec-1.1.0/LICENSE-MIT",
+          "sha256": "6efb0476a1cc085077ed49357026d8c173bf33017278ef440f222fb9cbcb66e6"
+        }
+      ],
+      "inherits_ironrdp_licenses": false,
+      "status": "collected"
+    },
+    {
+      "name": "toml_parser",
+      "version": "1.1.3+spec-1.1.0",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "download_url": "https://crates.io/api/v1/crates/toml_parser/1.1.3+spec-1.1.0/download",
+      "registry_checksum": "1d38ac1cf9b95face32296c0a3ede1fdc270627c9d9c02a7274dd6d960dc4d56",
+      "license_expression": "MIT OR Apache-2.0",
+      "repository": "https://github.com/toml-rs/toml",
+      "used_by": [
+        "launcher"
+      ],
+      "features": [
+        "alloc",
+        "default",
+        "std"
+      ],
+      "notice_files": [
+        {
+          "path": "licenses/rust/toml_parser-1.1.3+spec-1.1.0/LICENSE-APACHE",
+          "sha256": "c6596eb7be8581c18be736c846fb9173b69eccf6ef94c5135893ec56bd92ba08"
+        },
+        {
+          "path": "licenses/rust/toml_parser-1.1.3+spec-1.1.0/LICENSE-MIT",
+          "sha256": "6efb0476a1cc085077ed49357026d8c173bf33017278ef440f222fb9cbcb66e6"
         }
       ],
       "inherits_ironrdp_licenses": false,
@@ -12920,6 +13716,7 @@
       "license_expression": "MIT OR Apache-2.0",
       "repository": "https://github.com/paholg/typenum",
       "used_by": [
+        "launcher",
         "session"
       ],
       "features": [
@@ -13989,6 +14786,34 @@
       "status": "collected"
     },
     {
+      "name": "winnow",
+      "version": "1.0.4",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "download_url": "https://crates.io/api/v1/crates/winnow/1.0.4/download",
+      "registry_checksum": "23b97319f7b8343df12cc98938e5c3eb436064524c8d2b4e30a1d3a36eecdf81",
+      "license_expression": "MIT",
+      "repository": "https://github.com/winnow-rs/winnow",
+      "used_by": [
+        "launcher"
+      ],
+      "features": [
+        "alloc",
+        "ascii",
+        "binary",
+        "default",
+        "parser",
+        "std"
+      ],
+      "notice_files": [
+        {
+          "path": "licenses/rust/winnow-1.0.4/LICENSE-MIT",
+          "sha256": "cb5aedb296c5246d1f22e9099f925a65146f9f0d6b4eebba97fd27a6cdbbab2d"
+        }
+      ],
+      "inherits_ironrdp_licenses": false,
+      "status": "collected"
+    },
+    {
       "name": "winscard",
       "version": "0.3.3",
       "source": "registry+https://github.com/rust-lang/crates.io-index",
@@ -14451,6 +15276,98 @@
       "status": "collected"
     },
     {
+      "name": "zbus",
+      "version": "5.19.0",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "download_url": "https://crates.io/api/v1/crates/zbus/5.19.0/download",
+      "registry_checksum": "5db4be7c075cb421e4b7ee645541604239bd243ba7c357511f4ff3a74b555907",
+      "license_expression": "MIT",
+      "repository": "https://github.com/z-galaxy/zbus/",
+      "used_by": [
+        "launcher"
+      ],
+      "features": [
+        "tokio"
+      ],
+      "notice_files": [
+        {
+          "path": "licenses/rust/zbus-5.19.0/LICENSE",
+          "sha256": "260e4ff3fc493695880c90774283eb1e3d018f898fabe655bbd52dd2cbd2fcad"
+        }
+      ],
+      "inherits_ironrdp_licenses": false,
+      "status": "collected"
+    },
+    {
+      "name": "zbus_macros",
+      "version": "5.19.0",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "download_url": "https://crates.io/api/v1/crates/zbus_macros/5.19.0/download",
+      "registry_checksum": "2990635d09ade6df1868f72f8cac69a876a90981e8bd3c40b1be413f8dc88f40",
+      "license_expression": "MIT",
+      "repository": "https://github.com/z-galaxy/zbus/",
+      "used_by": [
+        "launcher"
+      ],
+      "features": [
+        "default",
+        "gvariant"
+      ],
+      "notice_files": [
+        {
+          "path": "licenses/rust/zbus_macros-5.19.0/LICENSE",
+          "sha256": "260e4ff3fc493695880c90774283eb1e3d018f898fabe655bbd52dd2cbd2fcad"
+        }
+      ],
+      "inherits_ironrdp_licenses": false,
+      "status": "collected"
+    },
+    {
+      "name": "zbus_names",
+      "version": "4.3.4",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "download_url": "https://crates.io/api/v1/crates/zbus_names/4.3.4/download",
+      "registry_checksum": "d8bf88b4a3ff53e883001e0e0115b297a9d53c31b9c1edd2bfdd853e3428624e",
+      "license_expression": "MIT",
+      "repository": "https://github.com/z-galaxy/zbus/",
+      "used_by": [
+        "launcher"
+      ],
+      "features": [],
+      "notice_files": [
+        {
+          "path": "licenses/rust/zbus_names-4.3.4/LICENSE",
+          "sha256": "260e4ff3fc493695880c90774283eb1e3d018f898fabe655bbd52dd2cbd2fcad"
+        }
+      ],
+      "inherits_ironrdp_licenses": false,
+      "status": "collected"
+    },
+    {
+      "name": "zcheapstr",
+      "version": "1.1.0",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "download_url": "https://crates.io/api/v1/crates/zcheapstr/1.1.0/download",
+      "registry_checksum": "d1afec51604565183aeb5c54c20aeab286120d4e4460f7f76e3e8bb8c0d99473",
+      "license_expression": "MIT",
+      "repository": "https://github.com/z-galaxy/zcheapstr/",
+      "used_by": [
+        "launcher"
+      ],
+      "features": [
+        "default",
+        "serde"
+      ],
+      "notice_files": [
+        {
+          "path": "licenses/rust/zcheapstr-1.1.0/LICENSE",
+          "sha256": "59871bb1612f8a0569655c10b995636827eceab42c6578cebdc45ad2922e0142"
+        }
+      ],
+      "inherits_ironrdp_licenses": false,
+      "status": "collected"
+    },
+    {
       "name": "zeno",
       "version": "0.3.3",
       "source": "registry+https://github.com/rust-lang/crates.io-index",
@@ -14624,6 +15541,7 @@
       "license_expression": "Apache-2.0 OR MIT",
       "repository": "https://github.com/RustCrypto/utils",
       "used_by": [
+        "launcher",
         "session"
       ],
       "features": [],
@@ -14833,6 +15751,80 @@
         ],
         "note": "Upstream ships the zlib licence as LICENSE-ZLIB and, as LICENSE.md, a statement offering Apache-2.0 or MIT that refers to LICENSE-APACHE and LICENSE-MIT files the repository does not contain at this commit; the Zlib option of the \"MIT OR Apache-2.0 OR Zlib\" expression is reproduced in full. See NOTICE.md in the notice directory."
       }
+    },
+    {
+      "name": "zvariant",
+      "version": "5.15.0",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "download_url": "https://crates.io/api/v1/crates/zvariant/5.15.0/download",
+      "registry_checksum": "c1d34c27cc6cdd1f458427519dd6b8612f7b7e3f7b9a0b2355d041dda9869147",
+      "license_expression": "MIT",
+      "repository": "https://github.com/z-galaxy/zbus/",
+      "used_by": [
+        "launcher"
+      ],
+      "features": [
+        "default",
+        "enumflags2",
+        "gvariant",
+        "serde_bytes"
+      ],
+      "notice_files": [
+        {
+          "path": "licenses/rust/zvariant-5.15.0/LICENSE",
+          "sha256": "260e4ff3fc493695880c90774283eb1e3d018f898fabe655bbd52dd2cbd2fcad"
+        }
+      ],
+      "inherits_ironrdp_licenses": false,
+      "status": "collected"
+    },
+    {
+      "name": "zvariant_derive",
+      "version": "5.15.0",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "download_url": "https://crates.io/api/v1/crates/zvariant_derive/5.15.0/download",
+      "registry_checksum": "864155e69b4352db0c7f374917bf45d1e0c8d17659c8b3dbf9795f3673f8c497",
+      "license_expression": "MIT",
+      "repository": "https://github.com/z-galaxy/zbus/",
+      "used_by": [
+        "launcher"
+      ],
+      "features": [
+        "default",
+        "gvariant"
+      ],
+      "notice_files": [
+        {
+          "path": "licenses/rust/zvariant_derive-5.15.0/LICENSE",
+          "sha256": "260e4ff3fc493695880c90774283eb1e3d018f898fabe655bbd52dd2cbd2fcad"
+        }
+      ],
+      "inherits_ironrdp_licenses": false,
+      "status": "collected"
+    },
+    {
+      "name": "zvariant_utils",
+      "version": "4.2.0",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "download_url": "https://crates.io/api/v1/crates/zvariant_utils/4.2.0/download",
+      "registry_checksum": "bad0294361a320b694a328460dc73add56c306150f5cb6bfafc44446120008a3",
+      "license_expression": "MIT",
+      "repository": "https://github.com/z-galaxy/zbus/",
+      "used_by": [
+        "launcher"
+      ],
+      "features": [
+        "default",
+        "gvariant"
+      ],
+      "notice_files": [
+        {
+          "path": "licenses/rust/zvariant_utils-4.2.0/LICENSE",
+          "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3"
+        }
+      ],
+      "inherits_ironrdp_licenses": false,
+      "status": "collected"
     }
   ],
   "notice_exceptions": [

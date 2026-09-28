@@ -47,6 +47,7 @@ struct BackendErrors {
     save_profile: Option<String>,
     delete_profile: Option<String>,
     save_preferences: Option<String>,
+    save_password: Option<String>,
 }
 
 /// The in-memory backend, shared so a test can read what the app saved, launched and
@@ -88,6 +89,21 @@ impl Backend for Shared {
     }
     fn kill_all(&mut self) {
         self.demo.borrow_mut().kill_all();
+    }
+    fn saved_password(&mut self, profile_id: &str) -> Result<Option<zeroize::Zeroizing<String>>, String> {
+        self.demo.borrow_mut().saved_password(profile_id)
+    }
+    fn has_saved_password(&mut self, profile_id: &str) -> Result<bool, String> {
+        self.demo.borrow_mut().has_saved_password(profile_id)
+    }
+    fn save_password(&mut self, profile: &Profile, password: &str) -> Result<(), String> {
+        if let Some(error) = &self.errors.borrow().save_password {
+            return Err(error.clone());
+        }
+        self.demo.borrow_mut().save_password(profile, password)
+    }
+    fn forget_password(&mut self, profile_id: &str) -> Result<(), String> {
+        self.demo.borrow_mut().forget_password(profile_id)
     }
 }
 
@@ -657,6 +673,182 @@ fn a_refused_sign_in_reopens_the_password_dialog_saying_why_with_an_empty_field(
     assert!(launcher.shows(REFUSED));
     assert_eq!(launcher.field(PASSWORD), "");
     assert!(launcher.app.sessions.is_empty());
+}
+
+// ---------- resolution ----------
+
+#[test]
+fn a_fixed_resolution_is_chosen_from_the_list_and_saved() {
+    let mut launcher = Launcher::full();
+    launcher.edit_in_full("Office PC");
+    assert!(launcher.shows("Resolution"));
+    // The drop-down draws its entries itself; the choice arrives as the message it sends.
+    let _ = launcher.app.update(Message::FormResolution(Some((1920, 1080))));
+    let _ = launcher.click("Save");
+    assert_eq!(launcher.saved("Office PC").resolution, "1920x1080");
+}
+
+#[test]
+fn the_simple_window_options_carry_a_resolution_into_the_connection() {
+    let mut launcher = Launcher::simple();
+    let _ = launcher.click("Office PC");
+    let _ = launcher.click("Show options");
+    assert!(launcher.shows("Resolution"));
+    let _ = launcher.app.update(Message::SetResolution(Some((2560, 1440))));
+    let _ = launcher.click("Connect");
+    assert_eq!(launcher.saved("Office PC").resolution, "2560x1440");
+}
+
+#[test]
+fn a_library_without_a_fixed_resolution_is_written_as_older_releases_expect() {
+    let json = serde_json::to_string(&Profile::draft()).unwrap();
+    assert!(!json.contains("resolution"));
+    let mut fixed = Profile::draft();
+    fixed.resolution = "1920x1080".into();
+    assert!(
+        serde_json::to_string(&fixed)
+            .unwrap()
+            .contains(r#""resolution":"1920x1080""#)
+    );
+}
+
+#[test]
+fn only_sizes_windows_accepts_are_valid_resolutions() {
+    use crate::library::parse_resolution;
+    assert_eq!(parse_resolution("1920x1080"), Some((1920, 1080)));
+    assert_eq!(parse_resolution("1366x768"), Some((1366, 768)));
+    for bad in ["", "1921x1080", "320x200", "9000x1080", "1920", "1920x", "wide"] {
+        assert_eq!(parse_resolution(bad), None, "{bad}");
+    }
+}
+
+// ---------- remembered passwords ----------
+
+impl Launcher {
+    /// Signs in to a computer with Remember ticked; returns the new session.
+    fn connect_remembering(&mut self, name: &str, password: &str) -> String {
+        let _ = self.click(name);
+        if self.app.layout == Layout::Simple {
+            let _ = self.click("Connect");
+        }
+        self.type_into(PASSWORD, password);
+        let _ = self.click("Remember this password");
+        let _ = self.click("Connect");
+        self.app.sessions.last().expect("a session opened").id.clone()
+    }
+    fn remembered(&self, name: &str) -> Option<String> {
+        let id = self.saved(name).id;
+        self.demo.borrow().passwords.get(&id).cloned()
+    }
+    /// The user closed the desktop window.
+    fn close_cleanly(&mut self, session: &str) {
+        self.report(Status {
+            ended: vec![Ended {
+                session: session.into(),
+                code: Some(0),
+                report: None,
+            }],
+            ..Status::default()
+        });
+    }
+    fn remember(&self, name: &str, password: &str) {
+        let id = self.saved(name).id;
+        self.demo.borrow_mut().passwords.insert(id, password.into());
+    }
+}
+
+#[test]
+fn a_remembered_password_connects_the_next_time_without_asking() {
+    let mut launcher = Launcher::simple();
+    let session = launcher.connect_remembering("Office PC", "dummy-test-only");
+    assert_eq!(launcher.remembered("Office PC").as_deref(), Some("dummy-test-only"));
+    launcher.answer(&session);
+    launcher.close_cleanly(&session);
+
+    let _ = launcher.click("Connect");
+
+    assert!(launcher.app.password_dialog().is_none(), "nothing to type");
+    assert_eq!(launcher.demo.borrow().launches.len(), 2);
+}
+
+#[test]
+fn a_password_is_only_remembered_when_asked() {
+    let mut launcher = Launcher::simple();
+    let _ = launcher.connect("Office PC", "dummy-test-only");
+    assert_eq!(launcher.remembered("Office PC"), None);
+}
+
+#[test]
+fn a_refused_remembered_password_is_forgotten_and_asked_for_again() {
+    let mut launcher = Launcher::simple();
+    launcher.remember("Office PC", "outdated");
+    let _ = launcher.click("Office PC");
+    let _ = launcher.click("Connect");
+    let session = launcher
+        .app
+        .sessions
+        .last()
+        .expect("connected with the remembered password")
+        .id
+        .clone();
+
+    launcher.refuse(&session);
+
+    assert_eq!(launcher.remembered("Office PC"), None);
+    assert!(launcher.shows(REFUSED));
+    assert!(
+        launcher.app.password_dialog().is_some_and(|f| f.remember),
+        "Remember stays ticked so the new password replaces the old one"
+    );
+}
+
+#[test]
+fn a_failed_keyring_save_still_connects_and_says_so() {
+    let mut launcher = Launcher::simple();
+    launcher.backend_errors.borrow_mut().save_password = Some("The keyring did not answer.".into());
+    let _ = launcher.connect_remembering("Office PC", "dummy-test-only");
+    assert_eq!(launcher.demo.borrow().launches.len(), 1);
+    assert!(launcher.shows("The password was not remembered. The keyring did not answer."));
+}
+
+#[test]
+fn a_remembered_password_can_be_forgotten_from_the_computer_dialog() {
+    let mut launcher = Launcher::full();
+    launcher.remember("Office PC", "dummy-test-only");
+    launcher.edit_in_full("Office PC");
+    assert!(launcher.shows("A password is remembered for this computer."));
+
+    let _ = launcher.click("Forget");
+
+    assert_eq!(launcher.remembered("Office PC"), None);
+    assert!(!launcher.shows("A password is remembered for this computer."));
+}
+
+#[test]
+fn moving_a_computer_to_another_address_or_account_forgets_its_password() {
+    for (field, value) in [("address", "192.0.2.99"), ("username", "someone-else")] {
+        let mut launcher = Launcher::full();
+        launcher.remember("Office PC", "dummy-test-only");
+        launcher.edit_in_full("Office PC");
+        let message = match field {
+            "address" => Message::FormAddress(value.into()),
+            _ => Message::FormUsername(value.into()),
+        };
+        let _ = launcher.app.update(message);
+        let _ = launcher.click("Save");
+        assert_eq!(launcher.remembered("Office PC"), None, "{field} changed");
+    }
+}
+
+#[test]
+fn removing_a_computer_forgets_its_password() {
+    let mut launcher = Launcher::full();
+    launcher.remember("Office PC", "dummy-test-only");
+    let id = launcher.saved("Office PC").id;
+    launcher.edit_in_full("Office PC");
+    let _ = launcher.click("Remove");
+    let _ = launcher.click("Remove");
+    assert!(!launcher.demo.borrow().passwords.contains_key(&id));
 }
 
 #[test]

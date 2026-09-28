@@ -148,9 +148,12 @@ impl App {
             username: String::new(),
             options: ConnectionOptions::default(),
             favourite: false,
+            saved_password: false,
             error: None,
         };
         if let Some(p) = &existing {
+            // A keyring that cannot be reached just hides the Forget button.
+            form.saved_password = self.backend.has_saved_password(&p.id).unwrap_or(false);
             // Older quick connections stored the address as their generated display name.
             form.name = if fresh && p.name == p.address {
                 String::new()
@@ -174,6 +177,11 @@ impl App {
         };
         let previous = form.editing.as_deref().and_then(|id| self.profile(id)).cloned();
         let address = form.address.trim().to_owned();
+        // A remembered password belongs to one account on one computer.
+        let moved = previous
+            .as_ref()
+            .filter(|p| p.address != address || p.username != form.username.trim())
+            .map(|p| p.id.clone());
         let mut profile = previous.unwrap_or_else(Profile::draft);
         profile.name = match form.name.trim() {
             "" => address.chars().take(100).collect(),
@@ -188,6 +196,9 @@ impl App {
             Ok((library, saved)) => {
                 self.library = library;
                 self.dialogs.pop();
+                if let Some(id) = moved {
+                    let _ = self.backend.forget_password(&id);
+                }
                 // Editing the selected computer also refreshes its simple-layout options.
                 // Leave another computer's unsaved selection and options alone.
                 if self.layout == Layout::Simple || self.chosen.as_deref() == Some(saved.as_str()) {
@@ -195,9 +206,27 @@ impl App {
                 }
                 self.resync();
                 if connect_after {
-                    return self.prompt_password(&saved, None);
+                    return self.prompt_password(&saved, None, false);
                 }
                 Task::none()
+            }
+            Err(e) => {
+                if let Some(Dialog::Computer(form)) = self.dialogs.last_mut() {
+                    form.error = Some(e);
+                }
+                Task::none()
+            }
+        }
+    }
+
+    pub(super) fn forget_form_password(&mut self) -> Task<Message> {
+        let Some(Dialog::Computer(ComputerForm { editing: Some(id), .. })) = self.dialogs.last() else {
+            return Task::none();
+        };
+        match self.backend.forget_password(&id.clone()) {
+            Ok(()) => {
+                self.with_form(|form| form.saved_password = false);
+                self.notify("The remembered password was forgotten.")
             }
             Err(e) => {
                 if let Some(Dialog::Computer(form)) = self.dialogs.last_mut() {

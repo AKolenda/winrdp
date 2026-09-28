@@ -8,7 +8,9 @@ use crate::app::{ComputerForm, Confirm, FORM_NAME, FORM_USERNAME, Message, PASSW
 use crate::style::{self, Tokens};
 
 use super::Element;
-use super::widgets::{check_row, connection_options, dialog_frame, field_label, footer_button, input, label, strong};
+use super::widgets::{
+    check_row, connection_options, dialog_frame, field_label, footer_button, input, label, resolution_picker, strong,
+};
 
 pub(super) fn computer<'a>(t: Tokens, form: &'a ComputerForm) -> Element<'a> {
     let mut body = column![
@@ -33,6 +35,7 @@ pub(super) fn computer<'a>(t: Tokens, form: &'a ComputerForm) -> Element<'a> {
         ),
     ]
     .extend(connection_options(t, form.options, Message::FormConnectionOption))
+    .push(resolution_picker(t, form.options.resolution, Message::FormResolution))
     .push(check_row(t, "Favourite", form.favourite, Message::FormFavourite))
     .spacing(12)
     .padding(Padding {
@@ -41,6 +44,19 @@ pub(super) fn computer<'a>(t: Tokens, form: &'a ComputerForm) -> Element<'a> {
         bottom: 18.0,
         left: 22.0,
     });
+    if form.saved_password {
+        body = body.push(
+            row![
+                label("A password is remembered for this computer.", 12.5, t.mute),
+                Space::new().width(Fill),
+                button(label("Forget", 12.5, t.accent))
+                    .padding(0)
+                    .style(style::link(t))
+                    .on_press(Message::FormForgetPassword),
+            ]
+            .align_y(Vertical::Center),
+        );
+    }
     if let Some(error) = &form.error {
         body = body.push(label(error.as_str(), 12.0, t.danger));
     }
@@ -90,8 +106,13 @@ pub(super) fn password<'a>(t: Tokens, form: &'a PasswordForm) -> Element<'a> {
             form.fullscreen,
             Message::PasswordFullscreen,
         ))
+        .push(check_row(t, "Remember this password", form.remember, Message::PasswordRemember))
         .push(label(
-            "Use the Windows account password, not its PIN. Passwords are not saved.",
+            if form.remember {
+                "Use the Windows account password, not its PIN. It is kept in your system keyring, not in Win RDP's files."
+            } else {
+                "Use the Windows account password, not its PIN."
+            },
             11.5,
             t.mute,
         ));

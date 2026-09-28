@@ -72,6 +72,9 @@ pub struct RpcApp {
     close_dialog: Option<crate::modal::CloseDialog>,
     /// Last pointer position, for the dialog's click hit-testing.
     pointer: (f64, f64),
+    /// The desktop keeps the size it connected with (`WINRDP_KEEP_RESOLUTION=1`): a resized
+    /// or full-screen window shows it scaled to fit instead of asking the server to resize.
+    keep_resolution: bool,
     /// What the process should exit with once the event loop stops, so a caller
     /// can tell a refused connection from a desktop the user closed.
     exit_code: i32,
@@ -258,6 +261,7 @@ impl RpcApp {
             bar: crate::bar::ConnectionBar::new(std::env::var("WINRDP_TITLE").unwrap_or_else(|_| "Win RDP".to_owned())),
             close_dialog: None,
             pointer: (0.0, 0.0),
+            keep_resolution: std::env::var("WINRDP_KEEP_RESOLUTION").is_ok_and(|v| v == "1"),
             exit_code: proc_exit::sysexits::OK.as_raw(),
         })
     }
@@ -398,10 +402,19 @@ impl RpcApp {
             return Ok(());
         }
 
+        // A kept resolution in a window of another size is drawn scaled to fit.
+        let fit = if self.keep_resolution {
+            damage::Fit::new(size, self.desktop_size)
+        } else {
+            None
+        };
         // An overlay is repainted whole over the frame, and where one was painted last
         // time the frame has to show again.
         let mut changed: Damage = dirty
-            .and_then(|dirty| Rect::from(&dirty).clip(size))
+            .and_then(|dirty| {
+                let rect = Rect::from(&dirty);
+                fit.map_or(rect, |fit| fit.to_window(rect)).clip(size)
+            })
             .into_iter()
             .collect();
         changed.extend(overlays.iter().chain(&self.overlays).copied());
@@ -415,7 +428,10 @@ impl RpcApp {
             .plan(buffer.age(), layout, &changed, present == Present::Everything);
         let frame_size = (usize::from(self.desktop_size.0), usize::from(self.desktop_size.1));
         for rect in &plan.copy {
-            damage::blit(&mut buffer, size.width as usize, frame.pixels(), frame_size, *rect);
+            match fit {
+                Some(fit) => damage::blit_scaled(&mut buffer, size.width as usize, frame.pixels(), fit, *rect),
+                None => damage::blit(&mut buffer, size.width as usize, frame.pixels(), frame_size, *rect),
+            }
         }
         // The session waits on the frame to apply its next update; the rest needs none of it.
         drop(frame);
@@ -630,11 +646,13 @@ impl RpcApp {
                     self.bar.reset();
                     return;
                 }
-                self.last_size = Some(size);
-                // Coalesce the burst of events a drag produces, but ask the server for
-                // the new size quickly; every millisecond here is spent showing a
-                // clipped stale frame.
-                self.resize_timeout = Some(Instant::now() + Duration::from_millis(150));
+                if !self.keep_resolution {
+                    self.last_size = Some(size);
+                    // Coalesce the burst of events a drag produces, but ask the server for
+                    // the new size quickly; every millisecond here is spent showing a
+                    // clipped stale frame.
+                    self.resize_timeout = Some(Instant::now() + Duration::from_millis(150));
+                }
                 window.request_redraw();
             }
             WindowEvent::CloseRequested => self.request_close(event_loop),
@@ -732,8 +750,17 @@ impl RpcApp {
                         return;
                     }
                 }
-                let Some((x, y)) = remote_pointer((position.x, position.y), self.desktop_size) else {
-                    // Over the black padding beside a desktop smaller than the window.
+                let position = (position.x, position.y);
+                let on_desktop = if self.keep_resolution {
+                    damage::Fit::new(win_size, self.desktop_size).map_or_else(
+                        || remote_pointer(position, self.desktop_size),
+                        |fit| fit.to_desktop(position),
+                    )
+                } else {
+                    remote_pointer(position, self.desktop_size)
+                };
+                let Some((x, y)) = on_desktop else {
+                    // Over the black padding or bars beside the desktop.
                     return;
                 };
                 let operation = ironrdp::input::Operation::MouseMove(ironrdp::input::MousePosition { x, y });

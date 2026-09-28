@@ -318,6 +318,13 @@ impl App {
                 }
                 Task::none()
             }
+            Message::SetResolution(size) => {
+                self.options.resolution = size;
+                if self.chosen.is_none() {
+                    self.draft_options = self.options;
+                }
+                Task::none()
+            }
             Message::Activate(id) => {
                 self.choose(&id);
                 self.connect_chosen()
@@ -342,7 +349,7 @@ impl App {
             Message::FilterSubmit => {
                 let value = self.filter.trim().to_owned();
                 if let Some(id) = self.profile_by_name(&value).map(|p| p.id.clone()) {
-                    return self.prompt_password(&id, None);
+                    return self.prompt_password(&id, None, false);
                 }
                 if looks_like_address(&value) {
                     self.edit_computer(None, true, &value)
@@ -355,7 +362,7 @@ impl App {
                 if self.live_for(&id).is_some() {
                     Task::none()
                 } else {
-                    self.prompt_password(&id, None)
+                    self.prompt_password(&id, None, false)
                 }
             }
             Message::Disconnect(session) => {
@@ -379,10 +386,15 @@ impl App {
                 self.with_form(|form| form.options.set(which, on));
                 Task::none()
             }
+            Message::FormResolution(size) => {
+                self.with_form(|form| form.options.resolution = size);
+                Task::none()
+            }
             Message::FormFavourite(favourite) => {
                 self.with_form(|form| form.favourite = favourite);
                 Task::none()
             }
+            Message::FormForgetPassword => self.forget_form_password(),
             Message::FormSave => self.save_computer(),
             Message::FormRemove => {
                 let Some(Dialog::Computer(ComputerForm { editing: Some(id), .. })) = self.dialogs.pop() else {
@@ -408,6 +420,12 @@ impl App {
                 }
                 Task::none()
             }
+            Message::PasswordRemember(on) => {
+                if let Some(Dialog::Password(f)) = self.dialogs.last_mut() {
+                    f.remember = on;
+                }
+                Task::none()
+            }
             Message::PasswordSubmit => {
                 if matches!(self.dialogs.last(), Some(Dialog::Password(f)) if f.password.is_empty()) {
                     return Task::none();
@@ -428,6 +446,7 @@ impl App {
                             Ok(library) => library,
                             Err(error) => return self.notify(error),
                         };
+                        let _ = self.backend.forget_password(&id);
                         if self.chosen.as_deref() == Some(id.as_str()) {
                             self.chosen = None;
                             self.computer_box.clear();

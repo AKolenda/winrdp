@@ -10,7 +10,7 @@ use crate::library::{Layout, Profile};
 use crate::style::{self, ICONS, Tokens, bold, icon};
 
 use super::Element;
-use super::widgets::{caption_button, connection_options, hrule, label, line, scroll, strong};
+use super::widgets::{caption_button, connection_options, hrule, label, line, resolution_picker, scroll, strong};
 
 pub(super) fn view(app: &App, t: Tokens) -> Element<'_> {
     let caption = row![
@@ -148,6 +148,7 @@ pub(super) fn view(app: &App, t: Tokens) -> Element<'_> {
     let options: Element<'_> = if app.options_open {
         column![hrule(t)]
             .extend(connection_options(t, app.options, Message::SetConnectionOption))
+            .push(resolution_picker(t, app.options.resolution, Message::SetResolution))
             .push(
                 row![
                     button(label("New computer\u{2026}", 13.0, t.ink))

@@ -11,6 +11,7 @@ mod app;
 mod backend;
 mod endpoint;
 mod host;
+mod keyring;
 mod library;
 mod style;
 #[cfg(test)]

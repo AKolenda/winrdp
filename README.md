@@ -77,6 +77,11 @@ computer or type an address, press Enter. Every desktop opens in its own window.
 **Full** adds a sidebar, search, and a tab for every open desktop. Desktops still open
 in their own windows.
 
+Passwords are saved only when you tick **Remember this password**, and then in the
+desktop's keyring (GNOME Keyring or KWallet, through the Secret Service), never in Win
+RDP's files. A remembered password that Windows refuses is forgotten, and Edit shows a
+Forget button while one is saved.
+
 ![The full launcher layout with a sidebar, search, and saved computers](docs/screenshots/launcher-full.png)
 
 
@@ -86,7 +91,9 @@ in their own windows.
 ![A session window titled Office PC - Win RDP (UDP v2) showing a Windows 11 desktop](docs/screenshots/session-window.png)
 
 - Windows 11 style connection bar in full screen: pin, restore, close, transport label.
-- Resizing the window resizes the remote desktop through Display Control.
+- Resizing the window resizes the remote desktop through Display Control, unless the
+  computer keeps a fixed resolution (Resolution, under the connection options): then the
+  desktop stays that size in any window, even full screen, scaled to fit with black bars.
 - Closing asks first, the way mstsc does; the remote session stays signed in.
 - Clipboard sharing supports text and images on X11 and Wayland; enable it per computer.
   Desktop clipboard integration and Windows policy can affect availability.

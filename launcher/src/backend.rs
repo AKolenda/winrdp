@@ -11,7 +11,7 @@ use serde::Deserialize;
 use zeroize::Zeroizing;
 
 pub use crate::library::Store;
-use crate::library::{Library, Preferences, Profile};
+use crate::library::{Library, Preferences, Profile, parse_resolution};
 
 /// Transport a running session published: `{"transport":"udp","udpVersion":2,"label":"UDP v2"}`.
 #[derive(Clone, Debug, PartialEq, Deserialize)]
@@ -63,6 +63,13 @@ pub trait Backend {
     fn poll(&mut self) -> Status;
     fn kill(&mut self, session: &str);
     fn kill_all(&mut self);
+    /// The password the user asked to remember for a computer, if any.
+    fn saved_password(&mut self, profile_id: &str) -> Result<Option<Zeroizing<String>>, String>;
+    /// Whether a password is remembered for a computer, without reading it.
+    fn has_saved_password(&mut self, profile_id: &str) -> Result<bool, String>;
+    fn save_password(&mut self, profile: &Profile, password: &str) -> Result<(), String>;
+    /// Forgets a computer's password; nothing to forget is not an error.
+    fn forget_password(&mut self, profile_id: &str) -> Result<(), String>;
 }
 
 /// `$XDG_CONFIG_HOME/io.winrdp.Next` and `$XDG_DATA_HOME/io.winrdp.Next/logs`: where the
@@ -191,6 +198,22 @@ impl Backend for Real {
             self.kill(&id);
         }
     }
+    fn saved_password(&mut self, profile_id: &str) -> Result<Option<Zeroizing<String>>, String> {
+        crate::keyring::get(profile_id)
+    }
+    fn has_saved_password(&mut self, profile_id: &str) -> Result<bool, String> {
+        crate::keyring::has(profile_id)
+    }
+    fn save_password(&mut self, profile: &Profile, password: &str) -> Result<(), String> {
+        let label = format!(
+            "Win RDP: {} ({} at {})",
+            profile.name, profile.username, profile.address
+        );
+        crate::keyring::set(&profile.id, &label, password)
+    }
+    fn forget_password(&mut self, profile_id: &str) -> Result<(), String> {
+        crate::keyring::delete(profile_id)
+    }
 }
 
 /// The session process for one connection. Credentials travel by environment (visible only to
@@ -234,6 +257,19 @@ fn session_command(
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null());
+    if let Some((width, height)) = parse_resolution(&profile.resolution) {
+        // The session opens at this size and keeps it, scaling the picture to the window.
+        command
+            .args([
+                "--desktop-width",
+                &width.to_string(),
+                "--desktop-height",
+                &height.to_string(),
+            ])
+            .env("WINRDP_KEEP_RESOLUTION", "1");
+    } else {
+        command.env_remove("WINRDP_KEEP_RESOLUTION");
+    }
     if !profile.clipboard {
         command.args(["--clipboard-type", "disable"]);
     }
@@ -307,6 +343,8 @@ pub struct Demo {
     pub killed: Vec<String>,
     pub pending: Status,
     pub live: HashMap<String, Option<Transport>>,
+    /// Remembered passwords by computer identifier, standing in for the keyring.
+    pub passwords: HashMap<String, String>,
     next: u32,
 }
 #[cfg_attr(not(test), allow(dead_code))]
@@ -401,6 +439,20 @@ impl Backend for Demo {
     fn kill_all(&mut self) {
         self.killed.extend(self.live.drain().map(|(session, _)| session));
     }
+    fn saved_password(&mut self, profile_id: &str) -> Result<Option<Zeroizing<String>>, String> {
+        Ok(self.passwords.get(profile_id).map(|p| Zeroizing::new(p.clone())))
+    }
+    fn has_saved_password(&mut self, profile_id: &str) -> Result<bool, String> {
+        Ok(self.passwords.contains_key(profile_id))
+    }
+    fn save_password(&mut self, profile: &Profile, password: &str) -> Result<(), String> {
+        self.passwords.insert(profile.id.clone(), password.to_owned());
+        Ok(())
+    }
+    fn forget_password(&mut self, profile_id: &str) -> Result<(), String> {
+        self.passwords.remove(profile_id);
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -456,6 +508,29 @@ mod tests {
         assert!(arguments.windows(2).any(|pair| pair == ["--clipboard-type", "disable"]));
         assert!(arguments.iter().any(|argument| *argument == "--audio-disable"));
         assert!(!arguments.iter().any(|argument| *argument == "--microphone"));
+    }
+
+    #[test]
+    fn a_fixed_resolution_reaches_the_session_and_matching_the_window_does_not() {
+        let mut profile = Profile::draft();
+        let command = command_for(&profile);
+        assert!(!command.get_args().any(|argument| argument == "--desktop-width"));
+        assert!(
+            command
+                .get_envs()
+                .any(|(key, value)| key == "WINRDP_KEEP_RESOLUTION" && value.is_none())
+        );
+
+        profile.resolution = "1920x1080".into();
+        let command = command_for(&profile);
+        let arguments: Vec<_> = command.get_args().collect();
+        assert!(arguments.windows(2).any(|pair| pair == ["--desktop-width", "1920"]));
+        assert!(arguments.windows(2).any(|pair| pair == ["--desktop-height", "1080"]));
+        assert!(
+            command
+                .get_envs()
+                .any(|(key, value)| { key == "WINRDP_KEEP_RESOLUTION" && value == Some(std::ffi::OsStr::new("1")) })
+        );
     }
 
     #[test]

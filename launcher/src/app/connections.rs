@@ -4,7 +4,7 @@ use iced::Task;
 use iced::widget::{Id, operation};
 
 use crate::backend::Ended;
-use crate::library::now_iso;
+use crate::library::{Profile, now_iso};
 
 use super::{
     App, Confirm, Confirmed, ConnectionOptions, Dialog, Message, PASSWORD, PasswordForm, Secret, Session, SessionState,
@@ -37,18 +37,29 @@ impl App {
                 Err(error) => return self.notify(error),
             }
         }
-        self.prompt_password(&profile_id, None)
+        self.prompt_password(&profile_id, None, false)
     }
 
     // ---------- connecting ----------
     /// `refused` is the sentence the computer gave for the previous attempt, shown
     /// above the box so a retyped password lands in a dialog that says what went wrong.
-    pub(super) fn prompt_password(&mut self, id: &str, refused: Option<String>) -> Task<Message> {
+    /// `remember` starts the box with Remember ticked, for a remembered password that
+    /// was just refused. Without a refusal, a remembered password connects straight away.
+    pub(super) fn prompt_password(&mut self, id: &str, refused: Option<String>, remember: bool) -> Task<Message> {
         let Some(p) = self.profile(id).cloned() else {
             return Task::none();
         };
         if p.username.is_empty() {
             return self.edit_computer(Some(id), true, "");
+        }
+        if refused.is_none() && self.password_dialog().is_none() {
+            // A keyring that cannot be reached means asking, as if nothing was remembered.
+            if let Ok(Some(password)) = self.backend.saved_password(id) {
+                return match self.start_session(&p, &password, p.fullscreen) {
+                    Ok(()) => Task::none(),
+                    Err(e) => self.notify(e),
+                };
+            }
         }
         // A refusal can land while the user is already typing into a dialog for another
         // computer. Re-pointing that dialog would send the password they are typing to
@@ -67,6 +78,7 @@ impl App {
             error: refused,
             password: Secret::default(),
             fullscreen: p.fullscreen,
+            remember,
         }));
         operation::focus(Id::new(PASSWORD))
     }
@@ -80,21 +92,30 @@ impl App {
         let Some(p) = self.profile(&form.profile).cloned() else {
             return Task::none();
         };
-        match self.backend.launch(&p, form.password.as_str(), form.fullscreen) {
-            Ok(session) => {
-                self.sessions.push(Session {
-                    id: session,
-                    name: p.name,
-                    profile_id: p.id,
-                    state: SessionState::Connecting,
-                    transport: None,
-                    stamped: false,
-                });
-                Task::none()
-            }
-            Err(e) => self.notify(e),
+        if let Err(e) = self.start_session(&p, form.password.as_str(), form.fullscreen) {
+            return self.notify(e);
+        }
+        if !form.remember {
+            return Task::none();
+        }
+        // Remembered as the connection starts; a refusal forgets it again (`report_end`).
+        match self.backend.save_password(&p, form.password.as_str()) {
+            Ok(()) => Task::none(),
+            Err(e) => self.notify(format!("The password was not remembered. {e}")),
         }
         // `form.password` is zeroized as it drops here.
+    }
+    fn start_session(&mut self, p: &Profile, password: &str, fullscreen: bool) -> Result<(), String> {
+        let session = self.backend.launch(p, password, fullscreen)?;
+        self.sessions.push(Session {
+            id: session,
+            name: p.name.clone(),
+            profile_id: p.id.clone(),
+            state: SessionState::Connecting,
+            transport: None,
+            stamped: false,
+        });
+        Ok(())
     }
     /// "Last opened" means the computer actually answered. Stamping it at launch put a
     /// refused sign-in at the top of the Recent list and claimed it had been opened.
@@ -146,10 +167,17 @@ impl App {
         };
         let toast = self.notify(format!("{name}: {}{detail}", failure.message));
         match session {
-            Some(s) if retry => Task::batch([
-                toast,
-                self.prompt_password(&s.profile_id, Some(failure.message.clone())),
-            ]),
+            Some(s) if retry => {
+                // A refused remembered password is forgotten, so the next connection asks.
+                let remembered = self.backend.has_saved_password(&s.profile_id).unwrap_or(false);
+                if remembered {
+                    let _ = self.backend.forget_password(&s.profile_id);
+                }
+                Task::batch([
+                    toast,
+                    self.prompt_password(&s.profile_id, Some(failure.message.clone()), remembered),
+                ])
+            }
             _ => toast,
         }
     }

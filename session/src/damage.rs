@@ -192,6 +192,141 @@ pub fn blit(buffer: &mut [u32], window_width: usize, frame: &[u32], frame_size: 
     }
 }
 
+/// Where a desktop kept at a fixed size is drawn in a window of another size: scaled to fit
+/// with its shape kept, centred, black bars on the other sides.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Fit {
+    desktop: (u32, u32),
+    /// The picture's place in the window.
+    area: Rect,
+}
+
+impl Fit {
+    /// `None` when either size is empty, or when the desktop fills the window 1:1 and
+    /// [`blit`] draws it as it is.
+    pub fn new(window: PhysicalSize<u32>, desktop: (u16, u16)) -> Option<Self> {
+        let desktop = (u32::from(desktop.0), u32::from(desktop.1));
+        if desktop.0 == 0 || desktop.1 == 0 || window.width == 0 || window.height == 0 {
+            return None;
+        }
+        if (window.width, window.height) == desktop {
+            return None;
+        }
+        // The window's width fits when the desktop is wider than the window in proportion.
+        let (width, height) =
+            if u64::from(window.width) * u64::from(desktop.1) <= u64::from(window.height) * u64::from(desktop.0) {
+                (window.width, scale(desktop.1, window.width, desktop.0).max(1))
+            } else {
+                (scale(desktop.0, window.height, desktop.1).max(1), window.height)
+            };
+        Some(Self {
+            desktop,
+            area: Rect {
+                x: (window.width - width) / 2,
+                y: (window.height - height) / 2,
+                width,
+                height,
+            },
+        })
+    }
+
+    /// The desktop pixel under a window position, or `None` over the bars.
+    pub fn to_desktop(self, position: (f64, f64)) -> Option<(u16, u16)> {
+        let x = position.0 - f64::from(self.area.x);
+        let y = position.1 - f64::from(self.area.y);
+        if x < 0.0 || y < 0.0 || x >= f64::from(self.area.width) || y >= f64::from(self.area.height) {
+            return None;
+        }
+        let x = (x * f64::from(self.desktop.0) / f64::from(self.area.width)).floor();
+        let y = (y * f64::from(self.desktop.1) / f64::from(self.area.height)).floor();
+        #[expect(clippy::as_conversions, reason = "bounded above by the desktop size")]
+        Some((
+            (x as u32).min(self.desktop.0 - 1) as u16,
+            (y as u32).min(self.desktop.1 - 1) as u16,
+        ))
+    }
+
+    /// The window area a change to `rect` of the desktop repaints, one pixel wider on each
+    /// side for the filtering that blends neighbours.
+    pub fn to_window(self, rect: Rect) -> Rect {
+        let (area, desktop) = (self.area, self.desktop);
+        let left = scale(rect.x, area.width, desktop.0).saturating_sub(1);
+        let top = scale(rect.y, area.height, desktop.1).saturating_sub(1);
+        let right = scale_up(rect.x + rect.width, area.width, desktop.0) + 1;
+        let bottom = scale_up(rect.y + rect.height, area.height, desktop.1) + 1;
+        Rect {
+            x: area.x + left,
+            y: area.y + top,
+            width: right.min(area.width) - left,
+            height: bottom.min(area.height) - top,
+        }
+    }
+}
+
+/// `value * to / from`, rounded down.
+fn scale(value: u32, to: u32, from: u32) -> u32 {
+    u32::try_from(u64::from(value) * u64::from(to) / u64::from(from)).unwrap_or(u32::MAX)
+}
+/// `value * to / from`, rounded up.
+fn scale_up(value: u32, to: u32, from: u32) -> u32 {
+    u32::try_from((u64::from(value) * u64::from(to)).div_ceil(u64::from(from))).unwrap_or(u32::MAX)
+}
+
+/// Like [`blit`], but draws `frame` scaled into `fit`, blending the four nearest pixels, with
+/// black bars around it.
+pub fn blit_scaled(buffer: &mut [u32], window_width: usize, frame: &[u32], fit: Fit, rect: Rect) {
+    let (frame_width, frame_height) = fit.desktop;
+    let area = fit.area;
+    // Where each column samples the frame: the two neighbouring source columns and the
+    // weight (0-256) of the right one; `None` over the bars.
+    let columns: Vec<Option<(usize, usize, u32)>> = (rect.x..rect.x + rect.width)
+        .map(|x| (x >= area.x && x < area.x + area.width).then(|| sample(x - area.x, area.width, frame_width)))
+        .collect();
+    for y in rect.y..rect.y + rect.height {
+        let start = y as usize * window_width + rect.x as usize;
+        let row = &mut buffer[start..start + rect.width as usize];
+        if y < area.y || y >= area.y + area.height {
+            row.fill(0);
+            continue;
+        }
+        let (top, bottom, down) = sample(y - area.y, area.height, frame_height);
+        let (top, bottom) = (
+            &frame[top * frame_width as usize..],
+            &frame[bottom * frame_width as usize..],
+        );
+        for (pixel, column) in row.iter_mut().zip(&columns) {
+            *pixel = match *column {
+                Some((left, right, across)) => blend(
+                    blend(top[left], top[right], across),
+                    blend(bottom[left], bottom[right], across),
+                    down,
+                ),
+                None => 0,
+            };
+        }
+    }
+}
+
+/// The source pixels either side of the centre of output pixel `index` of `output`, when
+/// `source` pixels are stretched over `output`, and the weight of the second (0-256).
+fn sample(index: u32, output: u32, source: u32) -> (usize, usize, u32) {
+    // Centre of the output pixel, in source pixels, in 1/256ths.
+    let centre = (i64::from(index) * 2 + 1) * i64::from(source) * 128 / i64::from(output) - 128;
+    let centre = centre.clamp(0, (i64::from(source) - 1) * 256);
+    #[expect(clippy::as_conversions, reason = "clamped to the source size above")]
+    let (first, weight) = ((centre >> 8) as usize, (centre & 0xFF) as u32);
+    (first, (first + 1).min(source as usize - 1), weight)
+}
+
+/// `a` and `b` mixed channel by channel, `weight` 256ths of the way to `b`.
+fn blend(a: u32, b: u32, weight: u32) -> u32 {
+    let mix = |shift: u32| {
+        let (a, b) = ((a >> shift) & 0xFF, (b >> shift) & 0xFF);
+        ((a * (256 - weight) + b * weight) >> 8) << shift
+    };
+    mix(16) | mix(8) | mix(0)
+}
+
 #[cfg(test)]
 mod tests {
     use winit::dpi::PhysicalSize;
@@ -359,5 +494,55 @@ mod tests {
         }
         assert_eq!(first_buffer, desktop);
         assert!(plan.present.is_empty());
+    }
+    use super::{Fit, blit_scaled};
+
+    #[test]
+    fn a_wide_desktop_in_a_squarer_window_gets_bars_above_and_below() {
+        let fit = Fit::new(PhysicalSize::new(1600, 1200), (1920, 1080)).expect("the sizes differ");
+        assert_eq!(fit.area, rect(0, 150, 1600, 900));
+        let fit = Fit::new(PhysicalSize::new(3000, 1080), (1920, 1080)).expect("the sizes differ");
+        assert_eq!(fit.area, rect(540, 0, 1920, 1080));
+        assert_eq!(
+            Fit::new(PhysicalSize::new(1920, 1080), (1920, 1080)),
+            None,
+            "1:1 needs no scaling"
+        );
+    }
+
+    #[test]
+    fn pointer_positions_map_back_onto_the_desktop_and_not_from_the_bars() {
+        let fit = Fit::new(PhysicalSize::new(1600, 1200), (1920, 1080)).expect("the sizes differ");
+        assert_eq!(fit.to_desktop((0.0, 150.0)), Some((0, 0)));
+        assert_eq!(fit.to_desktop((800.0, 600.0)), Some((960, 540)));
+        assert_eq!(fit.to_desktop((1599.9, 1049.9)), Some((1919, 1079)));
+        assert_eq!(fit.to_desktop((800.0, 100.0)), None);
+        assert_eq!(fit.to_desktop((800.0, 1100.0)), None);
+    }
+
+    #[test]
+    fn a_desktop_change_repaints_the_window_area_it_scales_to() {
+        let fit = Fit::new(PhysicalSize::new(960, 540), (1920, 1080)).expect("the sizes differ");
+        assert_eq!(fit.to_window(rect(100, 100, 10, 10)), rect(49, 49, 7, 7));
+        // Never past the picture.
+        assert_eq!(fit.to_window(rect(1910, 1070, 10, 10)), rect(954, 534, 6, 6));
+    }
+
+    #[test]
+    fn scaling_draws_the_picture_blended_inside_its_bars() {
+        // A 2x1 desktop, black and white, drawn into a 4x4 window: bars of one row above
+        // and below, and a blend between the two columns.
+        let fit = Fit::new(PhysicalSize::new(4, 4), (2, 1)).expect("the sizes differ");
+        assert_eq!(fit.area, rect(0, 1, 4, 2));
+        let frame = [0x00_00_00, 0xFF_FF_FF];
+        let mut buffer = vec![0x12_34_56; 16];
+        blit_scaled(&mut buffer, 4, &frame, fit, rect(0, 0, 4, 4));
+        assert_eq!(&buffer[0..4], &[0; 4], "top bar");
+        assert_eq!(&buffer[12..16], &[0; 4], "bottom bar");
+        let row = &buffer[4..8];
+        assert_eq!(row[0], 0, "the left edge is the black pixel");
+        assert_eq!(row[3], 0xFF_FF_FF, "the right edge is the white one");
+        assert!(row[1] > 0 && row[1] < row[2] && row[2] < 0xFF_FF_FF, "blended between");
+        assert_eq!(&buffer[8..12], row, "both picture rows alike");
     }
 }

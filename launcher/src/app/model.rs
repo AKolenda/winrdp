@@ -5,7 +5,7 @@ use zeroize::Zeroizing;
 
 use crate::backend::Transport;
 use crate::host;
-use crate::library::{Layout, Profile};
+use crate::library::{Layout, Profile, format_resolution, parse_resolution};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Page {
@@ -22,6 +22,8 @@ pub struct ConnectionOptions {
     pub audio: bool,
     pub microphone: bool,
     pub printer: bool,
+    /// A fixed desktop size; `None` follows the window.
+    pub resolution: Option<(u16, u16)>,
 }
 impl Default for ConnectionOptions {
     /// The defaults for a computer that is not saved yet: clipboard and audio on.
@@ -32,6 +34,7 @@ impl Default for ConnectionOptions {
             audio: true,
             microphone: false,
             printer: false,
+            resolution: None,
         }
     }
 }
@@ -43,6 +46,7 @@ impl ConnectionOptions {
             audio: p.audio,
             microphone: p.microphone,
             printer: p.printer,
+            resolution: parse_resolution(&p.resolution),
         }
     }
     pub(super) fn apply_to_profile(self, p: &mut Profile) {
@@ -51,6 +55,7 @@ impl ConnectionOptions {
         p.audio = self.audio;
         p.microphone = self.microphone;
         p.printer = self.printer;
+        p.resolution = format_resolution(self.resolution);
     }
 
     pub(super) fn set(&mut self, option: ConnectionOption, enabled: bool) {
@@ -106,6 +111,8 @@ pub struct ComputerForm {
     pub username: String,
     pub options: ConnectionOptions,
     pub favourite: bool,
+    /// A password is remembered in the keyring for the computer being edited.
+    pub saved_password: bool,
     pub error: Option<String>,
 }
 /// A password on its way through the UI: zeroed on drop, and never printed by `Debug`.
@@ -138,6 +145,8 @@ pub struct PasswordForm {
     pub error: Option<String>,
     pub password: Secret,
     pub fullscreen: bool,
+    /// Keep the password in the keyring once the connection starts.
+    pub remember: bool,
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum Confirmed {
@@ -200,6 +209,7 @@ pub enum Message {
     ComboDismiss,
     OptionsToggle,
     SetConnectionOption(ConnectionOption, bool),
+    SetResolution(Option<(u16, u16)>),
     Choose(String),
     Activate(String),
     ConnectChosen,
@@ -218,11 +228,14 @@ pub enum Message {
     FormAddress(String),
     FormUsername(String),
     FormConnectionOption(ConnectionOption, bool),
+    FormResolution(Option<(u16, u16)>),
     FormFavourite(bool),
+    FormForgetPassword,
     FormSave,
     FormRemove,
     PasswordInput(Secret),
     PasswordFullscreen(bool),
+    PasswordRemember(bool),
     PasswordSubmit,
     ConfirmYes,
     CloseDialog,

@@ -46,6 +46,32 @@ pub struct Profile {
     /// When the computer last answered, as an ISO 8601 UTC timestamp; empty if never.
     #[serde(default)]
     pub last_connected: String,
+    /// A fixed desktop size such as `1920x1080`, kept whatever the window's size, even full
+    /// screen; empty follows the window. Written only when set, so a library without one
+    /// still loads in releases that do not know the field.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub resolution: String,
+}
+
+/// The fixed desktop sizes a computer can keep.
+pub const RESOLUTIONS: [(u16, u16); 6] = [
+    (1280, 720),
+    (1366, 768),
+    (1600, 900),
+    (1920, 1080),
+    (2560, 1440),
+    (3840, 2160),
+];
+
+/// `1920x1080` as a desktop size Windows accepts: an even width of 640 to 8192 pixels and
+/// a height of 480 to 8192.
+pub fn parse_resolution(value: &str) -> Option<(u16, u16)> {
+    let (width, height) = value.split_once('x')?;
+    let (width, height) = (width.parse::<u16>().ok()?, height.parse::<u16>().ok()?);
+    ((640..=8192).contains(&width) && width % 2 == 0 && (480..=8192).contains(&height)).then_some((width, height))
+}
+pub fn format_resolution(size: Option<(u16, u16)>) -> String {
+    size.map_or_else(String::new, |(width, height)| format!("{width}x{height}"))
 }
 fn yes() -> bool {
     true
@@ -80,6 +106,7 @@ impl Profile {
             graphics: graphics(),
             keyboard_layout: layout(),
             last_connected: String::new(),
+            resolution: String::new(),
         }
     }
     /// The rules of the retired C++ engine's Profile::validationError; lengths count UTF-16 units as Qt did.
@@ -106,6 +133,9 @@ impl Profile {
         }
         if self.keyboard_layout == 0 {
             return Err("Choose a Windows keyboard layout.".into());
+        }
+        if !self.resolution.is_empty() && parse_resolution(&self.resolution).is_none() {
+            return Err("Choose a supported resolution.".into());
         }
         Ok(())
     }

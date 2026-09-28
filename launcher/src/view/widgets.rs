@@ -2,10 +2,13 @@
 //! Shared controls, typography and dialog framing for the launcher.
 use iced::alignment::{Horizontal, Vertical};
 use iced::widget::text::Wrapping;
-use iced::widget::{Column, Space, button, checkbox, column, container, hover, row, scrollable, svg, text, text_input};
+use iced::widget::{
+    Column, Space, button, checkbox, column, container, hover, pick_list, row, scrollable, svg, text, text_input,
+};
 use iced::{Color, Fill, Length, Padding};
 
 use crate::app::{ConnectionOption, ConnectionOptions, Message};
+use crate::library::RESOLUTIONS;
 use crate::style::{self, Tokens, bold, icon};
 
 use super::Element;
@@ -114,6 +117,43 @@ pub(super) fn connection_options<'a>(
         ),
     ]
     .map(|(label, option, enabled)| check_row(tokens, label, enabled, move |value| on_change(option, value)))
+}
+/// One entry of the resolution list: a fixed desktop size, or `None` to follow the window.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) struct ResolutionChoice(Option<(u16, u16)>);
+impl std::fmt::Display for ResolutionChoice {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.0 {
+            None => f.write_str("Match the window"),
+            Some((width, height)) => write!(f, "{width} \u{d7} {height}"),
+        }
+    }
+}
+/// The Resolution choice beside the connection options.
+pub(super) fn resolution_picker<'a>(
+    t: Tokens,
+    current: Option<(u16, u16)>,
+    on_pick: fn(Option<(u16, u16)>) -> Message,
+) -> Element<'a> {
+    let choices: Vec<ResolutionChoice> = std::iter::once(ResolutionChoice(None))
+        .chain(RESOLUTIONS.iter().map(|size| ResolutionChoice(Some(*size))))
+        .collect();
+    row![
+        label("Resolution", 13.0, t.ink),
+        Space::new().width(Fill),
+        pick_list(
+            choices,
+            Some(ResolutionChoice(current)),
+            move |choice: ResolutionChoice| on_pick(choice.0)
+        )
+        .text_size(13)
+        .padding([5, 10])
+        .width(170)
+        .style(style::pick(t))
+        .menu_style(style::pick_menu(t)),
+    ]
+    .align_y(Vertical::Center)
+    .into()
 }
 pub(super) fn input<'a>(
     t: Tokens,

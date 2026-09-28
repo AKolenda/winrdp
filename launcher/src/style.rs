@@ -2,7 +2,8 @@
 //! The launcher's look: one token set for light and dark, in the Windows 11 manner.
 use std::sync::{LazyLock, OnceLock};
 
-use iced::widget::{button, checkbox, container, radio, scrollable, svg, text_input, toggler};
+use iced::overlay::menu;
+use iced::widget::{button, checkbox, container, pick_list, radio, scrollable, svg, text_input, toggler};
 use iced::{Background, Border, Color, Font, Shadow, Theme, border, color, font};
 
 #[derive(Clone, Copy, Debug)]
@@ -466,6 +467,35 @@ pub fn field(t: Tokens) -> impl Fn(&Theme, text_input::Status) -> text_input::St
         placeholder: t.mute,
         value: t.ink,
         selection: Color { a: 0.35, ..t.accent },
+    }
+}
+/// A drop-down list drawn like a text field.
+pub fn pick(t: Tokens) -> impl Fn(&Theme, pick_list::Status) -> pick_list::Style {
+    move |_, s| pick_list::Style {
+        text_color: t.ink,
+        placeholder_color: t.mute,
+        handle_color: t.mute,
+        background: t.field.into(),
+        border: outline(
+            if matches!(s, pick_list::Status::Opened { .. }) {
+                t.accent
+            } else {
+                t.line
+            },
+            1.0,
+            5.0,
+        ),
+    }
+}
+/// The open list of a [`pick`] drop-down.
+pub fn pick_menu(t: Tokens) -> impl Fn(&Theme) -> menu::Style {
+    move |_| menu::Style {
+        background: t.panel.into(),
+        border: outline(t.line, 1.0, 5.0),
+        text_color: t.ink,
+        selected_text_color: t.ink,
+        selected_background: t.selected.into(),
+        shadow: Shadow::default(),
     }
 }
 /// A borderless input inside a drawn frame (the Computer box, the search field).
