@@ -1054,6 +1054,9 @@ impl RpcApp {
                 write_status_file(reliable_udp, udp_version);
             }
             RdpOutputEvent::WindowingOrders(_) => {}
+            // Only sent to a client built with `with_desktop_updates`; the session uses a
+            // shared framebuffer instead.
+            RdpOutputEvent::DesktopUpdate(_) => {}
         }
     }
 }

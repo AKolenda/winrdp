@@ -27,7 +27,7 @@ rustls = ["ironrdp/rustls"]
 native-tls = ["ironrdp/native-tls"]
 
 [dependencies]
-# Our fork (third_party/ironrdp, branch winrdp) of IronRDP at the reliable RDP-UDP2 commit.
+# Our fork (third_party/ironrdp, branch winrdp-rebase-2026-10-09) of IronRDP, rebased on upstream master.
 ironrdp-daemon = { path = "../third_party/ironrdp/crates/ironrdp-daemon" }
 ironrdp-rpc = { path = "../third_party/ironrdp/crates/ironrdp-rpc" }
 ironrdp = { path = "../third_party/ironrdp/crates/ironrdp", features = ["connector", "cliprdr", "input", "pdu", "client", "client-all", "client-vmconnect"] }

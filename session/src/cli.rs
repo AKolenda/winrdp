@@ -8,7 +8,7 @@ use clap::Parser;
 use clap::clap_derive::ValueEnum;
 use ironrdp::client::config::{
     ClipboardType as ResolvedClipboardType, Config, ConfigBuilder, Destination, DvcProxyInfo, MissingField,
-    TransportKind, VmConnectMode,
+    TransportKind, UdpVersion, VmConnectMode,
 };
 use ironrdp::pdu::rdp::capability_sets::{MajorPlatformType, client_codecs_capabilities};
 use ironrdp_cfg::PropertySetExt as _;
@@ -335,9 +335,19 @@ impl ViewerConfig {
         // The library overlays everything expressible as a `.rdp` property: destination, credentials,
         // transport, channels, desktop size, audio, DVC proxies, etc.
         let builder = ConfigBuilder::from_property_set(&properties)?;
-        // Local evaluation switch: nothing in the viewer or the `.rdp` schema enables reliable
-        // RDP-UDP2 yet, so expose the library opt-in through IRONRDP_UDP=1 for A/B testing.
-        let builder = builder.with_udp_transport(std::env::var_os("IRONRDP_UDP").is_some_and(|v| v == "1"));
+        // The launcher picks the transport options through the environment: IRONRDP_UDP=1
+        // turns on reliable RDP-UDP, IRONRDP_UDP_OFFER=1|2|3 is the highest RDP-UDP version
+        // offered, and IRONRDP_EGFX=1 advertises the graphics pipeline.
+        let env_on = |name: &str| std::env::var_os(name).is_some_and(|v| v == "1");
+        let mut builder = builder
+            .with_udp_transport(env_on("IRONRDP_UDP"))
+            .with_graphics_pipeline(env_on("IRONRDP_EGFX"));
+        match std::env::var("IRONRDP_UDP_OFFER").as_deref() {
+            Ok("1") => builder = builder.with_udp_offer_version(UdpVersion::V1),
+            Ok("2") => builder = builder.with_udp_offer_version(UdpVersion::V2),
+            Ok("3") => builder = builder.with_udp_offer_version(UdpVersion::V3),
+            _ => {}
+        }
 
         // Whether the `.rdp` file requested clipboard redirection; the CLI `--clipboard-type` is
         // resolved against this when applied below.
