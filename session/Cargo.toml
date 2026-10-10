@@ -1,6 +1,6 @@
 [package]
 name = "winrdp-session"
-version = "0.8.1"
+version = "0.8.2"
 edition = "2024"
 description = "Win RDP session window: one IronRDP-powered process per remote desktop"
 license = "AGPL-3.0-only"
@@ -27,7 +27,7 @@ rustls = ["ironrdp/rustls"]
 native-tls = ["ironrdp/native-tls"]
 
 [dependencies]
-# Our fork (third_party/ironrdp, branch winrdp-rebase-2026-10-09) of IronRDP, rebased on upstream master.
+# Our fork (third_party/ironrdp, branch winrdp) of IronRDP, rebased on upstream master.
 ironrdp-daemon = { path = "../third_party/ironrdp/crates/ironrdp-daemon" }
 ironrdp-rpc = { path = "../third_party/ironrdp/crates/ironrdp-rpc" }
 ironrdp = { path = "../third_party/ironrdp/crates/ironrdp", features = ["connector", "cliprdr", "input", "pdu", "client", "client-all", "client-vmconnect"] }

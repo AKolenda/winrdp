@@ -1,3 +1,22 @@
+# Win RDP 0.8.2
+
+- The IronRDP fork is rebased onto current upstream IronRDP. Fixes this project
+  contributed upstream (graphics and channels over the RDP-UDP tunnel, the RDP-UDP and
+  graphics-pipeline options, printer redirection) now come from upstream's reviewed code,
+  and the fork keeps only its remaining changes.
+- The Linux clipboard uses the Wayland data-control protocol, falling back to X11, instead
+  of the arboard crate. Clipboard data is copied only when the other side pastes.
+- A session no longer ends with a PDU error a few seconds after login when Windows sends
+  User Logged On before Client ID Confirm on the device redirection channel.
+- Resizing the window on the graphics pipeline no longer reconnects the session, and the
+  bitmap cache survives a graphics reset.
+- RFX Progressive refinement streams from Windows that omit trailing zero data no longer
+  end the session.
+
+This release was checked with the build, lint, test and notice checks and an end-to-end
+session against a local IronRDP server (connect, frames, resize, disconnect) under Xephyr.
+It has not yet been tested against a Windows PC.
+
 # Win RDP 0.8.1
 
 - The launcher switches between the compact window and the full workspace from an arrows

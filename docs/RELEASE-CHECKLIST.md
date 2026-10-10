@@ -28,7 +28,7 @@
 
 ## GitHub release
 
-- Keep version fields synchronized; `cargo xtask check-release --tag v0.8.1` validates them.
+- Keep version fields synchronized; `cargo xtask check-release --tag v0.8.2` validates them.
 - Create and push the release tag only after the desired source is committed in both repos.
 - Run the manual **Prepare draft release** workflow against that tag. It builds the
   package in an Ubuntu 22.04 container, so its dependencies are the oldest supported

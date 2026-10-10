@@ -10,6 +10,7 @@
   <content_rating type="oars-1.1"/>
   <description><p>Connect to Windows computers on your LAN or VPN using IronRDP session windows and a native launcher, both written in Rust.</p><p>This is independent software, not a Microsoft product. Features and supported environments are documented in the project repository.</p></description>
   <releases>
+    <release version="0.8.2" date="2026-10-10"/>
     <release version="0.8.1" date="2026-09-27"/>
     <release version="0.8.0" date="2026-09-26"/>
     <release version="0.7.7" date="2026-09-18"/>

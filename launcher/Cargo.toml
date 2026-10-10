@@ -1,6 +1,6 @@
 [package]
 name = "winrdp-next"
-version = "0.8.1"
+version = "0.8.2"
 edition = "2024"
 description = "Win RDP launcher: a native iced window that opens one IronRDP session process per remote desktop"
 license = "AGPL-3.0-only"

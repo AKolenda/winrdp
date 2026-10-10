@@ -7458,7 +7458,7 @@ dependencies = [
 
 [[package]]
 name = "winrdp-next"
-version = "0.8.1"
+version = "0.8.2"
 dependencies = [
  "iced",
  "iced_test",
@@ -7473,7 +7473,7 @@ dependencies = [
 
 [[package]]
 name = "winrdp-session"
-version = "0.8.1"
+version = "0.8.2"
 dependencies = [
  "ab_glyph",
  "anyhow",

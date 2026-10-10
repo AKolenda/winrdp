@@ -111,7 +111,7 @@ See [BUILDING.md](BUILDING.md) for prerequisites. Then:
 
 ```sh
 cargo xtask deb
-sudo apt install ./dist/winrdp-next_0.8.1_amd64.deb
+sudo apt install ./dist/winrdp-next_0.8.2_amd64.deb
 ```
 
 The package installs `winrdp-next` (the launcher) and `winrdp-session` (one process per
