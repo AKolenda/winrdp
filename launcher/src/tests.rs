@@ -67,6 +67,7 @@ struct BackendErrors {
     forget_password: Option<String>,
     pending_password:
         Option<iced::futures::channel::oneshot::Receiver<Result<Option<zeroize::Zeroizing<String>>, String>>>,
+    pending_presence: Option<iced::futures::channel::oneshot::Receiver<Result<bool, String>>>,
 }
 
 /// The in-memory backend, shared so a test can read what the app saved, launched and
@@ -116,6 +117,9 @@ impl Backend for Shared {
         self.demo.borrow_mut().saved_password(credentials)
     }
     fn has_saved_password(&mut self, credentials: &Credentials) -> CredentialFuture<bool> {
+        if let Some(pending) = self.errors.borrow_mut().pending_presence.take() {
+            return Box::pin(async move { pending.await.map_err(|error| error.to_string())? });
+        }
         self.demo.borrow_mut().has_saved_password(credentials)
     }
     fn save_password(&mut self, profile: &Profile, password: &str) -> CredentialFuture<()> {
@@ -202,6 +206,8 @@ impl Launcher {
                 | Message::RowPressed(_)
                 | Message::Edit(_)
                 | Message::EditChosen
+                | Message::FormAddress(_)
+                | Message::FormUsername(_)
                 | Message::FormSave
                 | Message::FormForgetPassword
                 | Message::PasswordSubmit
@@ -897,6 +903,75 @@ fn a_remembered_password_can_be_forgotten_from_the_computer_dialog() {
 
     assert_eq!(launcher.remembered("Office PC"), None);
     assert!(!launcher.shows("A password is remembered for this computer."));
+}
+
+#[test]
+fn editing_credentials_discards_pending_password_presence() {
+    for change in [
+        Message::FormAddress("192.0.2.99".into()),
+        Message::FormUsername("someone-else".into()),
+    ] {
+        let mut launcher = Launcher::full();
+        launcher.remember("Office PC", "original-secret");
+        let profile = launcher.saved("Office PC");
+        let (reply, pending) = iced::futures::channel::oneshot::channel();
+        launcher.backend_errors.borrow_mut().pending_presence = Some(pending);
+        let lookup = launcher.app.update(Message::Edit(profile.id.clone()));
+        launcher.update(change);
+        reply.send(Ok(true)).unwrap();
+        launcher.finish_credentials(lookup);
+        assert!(
+            !launcher.shows("Forget"),
+            "the old identity's reply must not offer Forget"
+        );
+        launcher.update(Message::FormForgetPassword);
+        let _ = launcher.click("Cancel");
+        assert_eq!(launcher.remembered("Office PC").as_deref(), Some("original-secret"));
+        assert_eq!(launcher.saved("Office PC"), profile);
+    }
+}
+
+#[test]
+fn editing_credentials_hides_loaded_presence_and_rejects_a_queued_forget() {
+    for change in [
+        Message::FormAddress("192.0.2.99".into()),
+        Message::FormUsername("someone-else".into()),
+    ] {
+        let mut launcher = Launcher::full();
+        launcher.remember("Office PC", "original-secret");
+        launcher.edit_in_full("Office PC");
+        assert!(launcher.shows("Forget"));
+        launcher.update(change);
+        let forget_visible = launcher.shows("Forget");
+        // This click could already have been queued while the previous view was visible.
+        launcher.update(Message::FormForgetPassword);
+        let _ = launcher.click("Cancel");
+        assert_eq!(launcher.remembered("Office PC").as_deref(), Some("original-secret"));
+        assert!(!forget_visible, "the changed identity must hide the previous password");
+    }
+}
+
+#[test]
+fn editing_credentials_back_to_the_saved_identity_restores_forget() {
+    let mut launcher = Launcher::full();
+    launcher.remember("Office PC", "original-secret");
+    let profile = launcher.saved("Office PC");
+    launcher.edit_in_full("Office PC");
+    launcher.update(Message::FormName("A different display name".into()));
+    launcher.update(Message::FormAddress(format!(" {} ", profile.address)));
+    assert!(
+        launcher.shows("Forget"),
+        "display names and trimmed whitespace do not retarget credentials"
+    );
+    launcher.update(Message::FormUsername("someone-else".into()));
+    assert!(!launcher.shows("Forget"));
+    launcher.update(Message::FormUsername(format!(" {} ", profile.username)));
+    assert!(
+        launcher.shows("Forget"),
+        "returning to the saved identity must refresh its keyring presence"
+    );
+    let _ = launcher.click("Forget");
+    assert_eq!(launcher.remembered("Office PC"), None);
 }
 
 #[test]

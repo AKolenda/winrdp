@@ -170,21 +170,54 @@ impl App {
         }
         self.combo_open = false;
         self.dialogs.push(Dialog::Computer(form));
-        let lookup = existing.map_or_else(Task::none, |profile| {
-            let credentials = Credentials::from(&profile);
-            Task::perform(self.backend.has_saved_password(&credentials), move |result| {
-                Message::PasswordPresence {
-                    request,
-                    credentials,
-                    result,
-                }
-            })
-        });
         Task::batch([
             operation::focus(Id::new(if fresh { FORM_USERNAME } else { FORM_NAME })),
-            lookup,
+            self.check_form_password(),
         ])
     }
+
+    pub(super) fn edit_form_credentials(&mut self, edit: impl FnOnce(&mut ComputerForm)) -> Task<Message> {
+        let Some(Dialog::Computer(form)) = self.dialogs.last_mut() else {
+            return Task::none();
+        };
+        let previous = (form.address.trim().to_owned(), form.username.trim().to_owned());
+        edit(form);
+        form.error = None;
+        if form.address.trim() == previous.0 && form.username.trim() == previous.1 {
+            return Task::none();
+        }
+        form.saved_password = false;
+        let request = self.credential_request();
+        self.with_form(|form| form.keyring_request = request);
+        // Returning to the saved identity makes Forget available again after a fresh lookup.
+        self.check_form_password()
+    }
+
+    fn check_form_password(&mut self) -> Task<Message> {
+        let Some(Dialog::Computer(form)) = self.dialogs.last() else {
+            return Task::none();
+        };
+        let Some(credentials) = form
+            .editing
+            .as_deref()
+            .and_then(|id| self.profile(id))
+            .map(Credentials::from)
+        else {
+            return Task::none();
+        };
+        if !form.matches_credentials(&credentials) {
+            return Task::none();
+        }
+        let request = form.keyring_request;
+        Task::perform(self.backend.has_saved_password(&credentials), move |result| {
+            Message::PasswordPresence {
+                request,
+                credentials,
+                result,
+            }
+        })
+    }
+
     pub(super) fn save_computer(&mut self) -> Task<Message> {
         let Some(Dialog::Computer(form)) = self.dialogs.last() else {
             return Task::none();
@@ -232,12 +265,20 @@ impl App {
     }
 
     pub(super) fn forget_form_password(&mut self) -> Task<Message> {
-        let Some(Dialog::Computer(ComputerForm { editing: Some(id), .. })) = self.dialogs.last() else {
+        let Some(Dialog::Computer(form)) = self.dialogs.last() else {
             return Task::none();
         };
-        let Some(credentials) = self.profile(id).map(Credentials::from) else {
+        let Some(credentials) = form
+            .editing
+            .as_deref()
+            .and_then(|id| self.profile(id))
+            .map(Credentials::from)
+        else {
             return Task::none();
         };
+        if !form.saved_password || !form.matches_credentials(&credentials) {
+            return Task::none();
+        }
         let request = self.credential_request();
         self.with_form(|form| form.keyring_request = request);
         self.forget_credentials(credentials, Some(request))
@@ -259,7 +300,7 @@ impl App {
         }
         if let Some(Dialog::Computer(form)) = self.dialogs.last_mut()
             && form.keyring_request == request
-            && form.editing.as_deref() == Some(credentials.profile_id.as_str())
+            && form.matches_credentials(credentials)
         {
             // An unavailable keyring leaves the dialog usable, without a Forget button.
             form.saved_password = result.unwrap_or(false);
@@ -280,7 +321,7 @@ impl App {
         };
         if !self.current_credentials(credentials)
             || !matches!(self.dialogs.last(), Some(Dialog::Computer(form))
-                if form.keyring_request == request && form.editing.as_deref() == Some(credentials.profile_id.as_str()))
+                if form.keyring_request == request && form.matches_credentials(credentials))
         {
             return Task::none();
         }

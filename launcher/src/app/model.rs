@@ -119,6 +119,14 @@ pub struct ComputerForm {
     pub(super) keyring_request: u64,
     pub error: Option<String>,
 }
+impl ComputerForm {
+    /// Compare the draft as Save would persist it before offering a destructive keyring action.
+    pub(super) fn matches_credentials(&self, credentials: &Credentials) -> bool {
+        self.editing.as_deref() == Some(credentials.profile_id.as_str())
+            && self.address.trim() == credentials.address
+            && self.username.trim() == credentials.username
+    }
+}
 /// A password on its way through the UI: zeroed on drop, and never printed by `Debug`.
 #[derive(Clone, Default)]
 pub struct Secret(Zeroizing<String>);

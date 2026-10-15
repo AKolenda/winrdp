@@ -396,14 +396,8 @@ impl App {
                 self.with_form(|f| f.name = v);
                 Task::none()
             }
-            Message::FormAddress(v) => {
-                self.with_form(|f| f.address = v);
-                Task::none()
-            }
-            Message::FormUsername(v) => {
-                self.with_form(|f| f.username = v);
-                Task::none()
-            }
+            Message::FormAddress(v) => self.edit_form_credentials(|form| form.address = v),
+            Message::FormUsername(v) => self.edit_form_credentials(|form| form.username = v),
             Message::FormConnectionOption(which, on) => {
                 self.with_form(|form| form.options.set(which, on));
                 Task::none()
