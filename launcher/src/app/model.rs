@@ -3,7 +3,7 @@
 use iced::{keyboard, window};
 use zeroize::Zeroizing;
 
-use crate::backend::Transport;
+use crate::backend::{Credentials, Transport};
 use crate::host;
 use crate::library::{Layout, Profile, format_resolution, parse_resolution};
 
@@ -91,6 +91,8 @@ pub struct Session {
     pub state: SessionState,
     pub transport: Option<Transport>,
     pub(super) stamped: bool,
+    pub(super) credentials: Credentials,
+    pub(super) remembered: bool,
 }
 impl Session {
     pub fn label(&self) -> &str {
@@ -113,7 +115,17 @@ pub struct ComputerForm {
     pub favourite: bool,
     /// A password is remembered in the keyring for the computer being edited.
     pub saved_password: bool,
+    /// Identifies this dialog's latest keyring request; late replies cannot change a reopened form.
+    pub(super) keyring_request: u64,
     pub error: Option<String>,
+}
+impl ComputerForm {
+    /// Compare the draft as Save would persist it before offering a destructive keyring action.
+    pub(super) fn matches_credentials(&self, credentials: &Credentials) -> bool {
+        self.editing.as_deref() == Some(credentials.profile_id.as_str())
+            && self.address.trim() == credentials.address
+            && self.username.trim() == credentials.username
+    }
 }
 /// A password on its way through the UI: zeroed on drop, and never printed by `Debug`.
 #[derive(Clone, Default)]
@@ -131,6 +143,11 @@ impl From<String> for Secret {
         Self(Zeroizing::new(value))
     }
 }
+impl From<Zeroizing<String>> for Secret {
+    fn from(value: Zeroizing<String>) -> Self {
+        Self(value)
+    }
+}
 impl std::fmt::Debug for Secret {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str("Secret(..)")
@@ -140,6 +157,9 @@ impl std::fmt::Debug for Secret {
 #[derive(Debug)]
 pub struct PasswordForm {
     pub profile: String,
+    pub(super) credentials: Credentials,
+    /// Cancelling or typing discards a pending automatic sign-in.
+    pub lookup: Option<u64>,
     pub title: String,
     pub account: String,
     pub error: Option<String>,
@@ -237,6 +257,25 @@ pub enum Message {
     PasswordFullscreen(bool),
     PasswordRemember(bool),
     PasswordSubmit,
+    PasswordLoaded {
+        request: u64,
+        credentials: Credentials,
+        result: Result<Option<Secret>, String>,
+    },
+    PasswordPresence {
+        request: u64,
+        credentials: Credentials,
+        result: Result<bool, String>,
+    },
+    PasswordStored {
+        credentials: Credentials,
+        result: Result<(), String>,
+    },
+    PasswordForgotten {
+        request: Option<u64>,
+        credentials: Credentials,
+        result: Result<(), String>,
+    },
     ConfirmYes,
     CloseDialog,
     OpenSettings,

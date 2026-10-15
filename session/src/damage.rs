@@ -71,7 +71,8 @@ impl From<&InclusiveRectangle> for Rect {
     }
 }
 
-/// A handful of rectangles; overlapping ones are fine, just copied twice.
+/// A handful of rectangles. Presentation plans merge overlaps so effects such as
+/// modal dimming visit each pixel only once.
 pub type Damage = SmallVec<[Rect; 4]>;
 
 /// Everything a buffer's contents depend on besides the pixels: a buffer drawn for another
@@ -160,12 +161,55 @@ impl History {
     }
 }
 
-/// One whole-window rectangle instead of a list that already contains it.
+/// Collapse whole-window damage and merge overlaps. Besides avoiding repeated
+/// copies, disjoint rectangles let the caller dim freshly copied pixels once.
 fn simplify(damage: Damage, window: PhysicalSize<u32>) -> Damage {
     if damage.iter().any(|rect| rect.covers(window)) {
-        smallvec![Rect::covering(window)]
-    } else {
-        damage
+        return smallvec![Rect::covering(window)];
+    }
+    let mut merged = Damage::new();
+    for mut rect in damage {
+        while let Some(index) = merged.iter().position(|other| {
+            rect.x < other.x + other.width
+                && other.x < rect.x + rect.width
+                && rect.y < other.y + other.height
+                && other.y < rect.y + rect.height
+        }) {
+            let other = merged.remove(index);
+            let right = (rect.x + rect.width).max(other.x + other.width);
+            let bottom = (rect.y + rect.height).max(other.y + other.height);
+            rect.x = rect.x.min(other.x);
+            rect.y = rect.y.min(other.y);
+            rect.width = right - rect.x;
+            rect.height = bottom - rect.y;
+        }
+        merged.push(rect);
+    }
+    merged
+}
+
+/// An unscaled UI copy used while software scaling. Only dirty source rows are
+/// copied under the shared framebuffer lock; filtering uses this copy after unlock.
+#[derive(Default)]
+pub struct FrameCache {
+    size: (u16, u16),
+    pixels: Vec<u32>,
+}
+
+impl FrameCache {
+    pub fn update(&mut self, pixels: &[u32], size: (u16, u16), dirty: Option<Rect>) {
+        if self.size != size {
+            self.pixels.clear();
+            self.pixels.extend_from_slice(pixels);
+            self.size = size;
+        } else if let Some(rect) = dirty {
+            let width = usize::from(size.0);
+            blit(&mut self.pixels, width, pixels, (width, usize::from(size.1)), rect);
+        }
+    }
+
+    pub fn pixels(&self) -> &[u32] {
+        &self.pixels
     }
 }
 
@@ -246,14 +290,15 @@ impl Fit {
         ))
     }
 
-    /// The window area a change to `rect` of the desktop repaints, one pixel wider on each
-    /// side for the filtering that blends neighbours.
+    /// The window area a change to `rect` of the desktop repaints. Expand in source
+    /// pixels before scaling: a neighbouring source pixel can span several output
+    /// pixels when the desktop is enlarged.
     pub fn to_window(self, rect: Rect) -> Rect {
         let (area, desktop) = (self.area, self.desktop);
-        let left = scale(rect.x, area.width, desktop.0).saturating_sub(1);
-        let top = scale(rect.y, area.height, desktop.1).saturating_sub(1);
-        let right = scale_up(rect.x + rect.width, area.width, desktop.0) + 1;
-        let bottom = scale_up(rect.y + rect.height, area.height, desktop.1) + 1;
+        let left = scale(rect.x.saturating_sub(1), area.width, desktop.0);
+        let top = scale(rect.y.saturating_sub(1), area.height, desktop.1);
+        let right = scale_up((rect.x + rect.width + 1).min(desktop.0), area.width, desktop.0);
+        let bottom = scale_up((rect.y + rect.height + 1).min(desktop.1), area.height, desktop.1);
         Rect {
             x: area.x + left,
             y: area.y + top,
@@ -320,11 +365,12 @@ fn sample(index: u32, output: u32, source: u32) -> (usize, usize, u32) {
 
 /// `a` and `b` mixed channel by channel, `weight` 256ths of the way to `b`.
 fn blend(a: u32, b: u32, weight: u32) -> u32 {
-    let mix = |shift: u32| {
-        let (a, b) = ((a >> shift) & 0xFF, (b >> shift) & 0xFF);
-        ((a * (256 - weight) + b * weight) >> 8) << shift
-    };
-    mix(16) | mix(8) | mix(0)
+    // Each weighted channel sum fits in 16 bits, so red and blue can be mixed
+    // together without a carry crossing between their lanes.
+    let inverse = 256 - weight;
+    let red_blue = (((a & 0x00FF_00FF) * inverse + (b & 0x00FF_00FF) * weight) >> 8) & 0x00FF_00FF;
+    let green = (((a & 0x0000_FF00) * inverse + (b & 0x0000_FF00) * weight) >> 8) & 0x0000_FF00;
+    red_blue | green
 }
 
 #[cfg(test)]
@@ -544,5 +590,86 @@ mod tests {
         assert_eq!(row[3], 0xFF_FF_FF, "the right edge is the white one");
         assert!(row[1] > 0 && row[1] < row[2] && row[2] < 0xFF_FF_FF, "blended between");
         assert_eq!(&buffer[8..12], row, "both picture rows alike");
+    }
+
+    #[test]
+    fn partial_upscaled_repaints_match_a_complete_repaint() {
+        let desktop = (5, 3);
+        for size in [
+            PhysicalSize::new(8, 5),
+            PhysicalSize::new(20, 12),
+            PhysicalSize::new(31, 19),
+        ] {
+            let fit = Fit::new(size, desktop).expect("the desktop is scaled");
+            let whole = Rect::covering(size);
+            let mut frame = vec![0; 15];
+            for index in 0..frame.len() {
+                let mut partial = vec![0; (size.width * size.height) as usize];
+                blit_scaled(&mut partial, size.width as usize, &frame, fit, whole);
+                frame[index] = 0xFF_FF_FF;
+                let dirty = rect(index as u32 % 5, index as u32 / 5, 1, 1);
+                blit_scaled(&mut partial, size.width as usize, &frame, fit, fit.to_window(dirty));
+                let mut complete = vec![0; partial.len()];
+                blit_scaled(&mut complete, size.width as usize, &frame, fit, whole);
+                assert_eq!(partial, complete, "source pixel {index}, window {size:?}");
+                frame[index] = 0;
+            }
+        }
+    }
+
+    #[test]
+    fn packed_color_blending_matches_each_independent_channel() {
+        let colors = [0, 0xFF_FF_FF, 0xFF_00_FF, 0x00_FF_00, 0x12_34_56, 0xAB_CD_EF];
+        for a in colors {
+            for b in colors {
+                for weight in 0..=256 {
+                    let channel = |shift: u32| {
+                        ((((a >> shift) & 0xFF) * (256 - weight) + ((b >> shift) & 0xFF) * weight) >> 8) << shift
+                    };
+                    assert_eq!(super::blend(a, b, weight), channel(16) | channel(8) | channel(0));
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn scale_cache_tracks_dirty_pixels_and_rebuilds_after_resize() {
+        let mut cache = super::FrameCache::default();
+        cache.update(&[1, 2, 3, 4], (2, 2), None);
+        cache.update(&[1, 8, 3, 9], (2, 2), Some(rect(1, 0, 1, 2)));
+        assert_eq!(cache.pixels(), &[1, 8, 3, 9]);
+        cache.update(&[10, 11, 12], (3, 1), None);
+        assert_eq!(cache.pixels(), &[10, 11, 12]);
+    }
+
+    #[test]
+    fn overlapping_damage_is_copied_and_dimmed_once() {
+        let size = PhysicalSize::new(8, 4);
+        let layout = Layout {
+            window: size,
+            desktop: (8, 4),
+        };
+        let mut history = History::default();
+        history.record(layout, damage(&[Rect::covering(size)]));
+        let plan = history.plan(
+            1,
+            layout,
+            &[rect(1, 1, 4, 2), rect(3, 1, 4, 2), rect(1, 1, 4, 2)],
+            false,
+        );
+        let mut pixels = vec![0xFF_FF_FF; 32];
+        for rect in plan.copy {
+            crate::drawing::dim_rect(&mut pixels, 8, rect);
+        }
+        for y in 0..4 {
+            for x in 0..8 {
+                let expected = if (1..3).contains(&y) && (1..7).contains(&x) {
+                    0x94_94_94
+                } else {
+                    0xFF_FF_FF
+                };
+                assert_eq!(pixels[y * 8 + x], expected);
+            }
+        }
     }
 }

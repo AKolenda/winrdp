@@ -1,5 +1,6 @@
 //! Native session window, input handling and configuration for Win RDP.
 
+mod input;
 mod keymap;
 
 pub mod app;

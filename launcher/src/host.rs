@@ -2,6 +2,7 @@
 //! Letting Windows connect *into* this computer. Win RDP is a client; the host side is
 //! GNOME Remote Desktop, driven through `grdctl`, `gsettings` and `systemctl --user`.
 //! Every call here blocks for up to ten seconds, so the window runs them off its thread.
+use std::io::Write;
 use std::process::{Command, Stdio};
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -43,8 +44,53 @@ fn sh(program: &str, args: &[&str]) -> Result<String, String> {
         Err(format!("{program} failed ({}).", output.status))
     }
 }
+
+/// Sends a single secret line over a private pipe. Neither the timeout wrapper nor
+/// the child receives the secret in its command line, and child output is discarded.
+fn sh_input(program: &str, args: &[&str], secret: &str) -> Result<(), String> {
+    let mut child = Command::new("timeout")
+        .arg("10")
+        .arg(program)
+        .args(args)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .map_err(|e| format!("{program}: {e}"))?;
+    let sent = child
+        .stdin
+        .take()
+        .ok_or_else(|| "Could not open the sharing password input.".to_owned())
+        .and_then(|mut input| {
+            input
+                .write_all(secret.as_bytes())
+                .and_then(|()| input.write_all(b"\n"))
+                .map_err(|_| "Could not send the sharing password.".to_owned())
+        });
+    // Always reap the child, including when it rejects stdin. The timeout also
+    // covers a keyring prompt or a child that stops reading.
+    let status = child.wait().map_err(|e| format!("{program}: {e}"))?;
+    sent?;
+    if status.success() {
+        Ok(())
+    } else {
+        Err(format!("{program} failed ({status})."))
+    }
+}
 fn user_unit_active(unit: &str) -> bool {
     sh("systemctl", &["--user", "is-active", unit]).is_ok_and(|s| s.trim() == "active")
+}
+
+fn status_field<'a>(text: &'a str, key: &str) -> Option<&'a str> {
+    text.lines()
+        .find_map(|line| line.trim().strip_prefix(key).map(str::trim))
+}
+
+fn credentials_present(text: &str) -> bool {
+    ["Username:", "Password:"].into_iter().all(|key| {
+        status_field(text, key)
+            .is_some_and(|value| !value.is_empty() && !matches!(value, "(none)" | "(empty)" | "(null)"))
+    })
 }
 
 /// Which of GNOME Remote Desktop's modes answers on the RDP port, so Settings can say so truthfully.
@@ -54,10 +100,6 @@ pub fn status() -> Status {
             port: 3389,
             ..Status::default()
         };
-    };
-    let field = |key: &str| {
-        text.lines()
-            .find_map(|l| l.trim().strip_prefix(key).map(|v| v.trim().to_owned()))
     };
     let mode = sh(
         "gsettings",
@@ -69,8 +111,10 @@ pub fn status() -> Status {
         sharing: user_unit_active("gnome-remote-desktop.service"),
         headless: user_unit_active("gnome-remote-desktop-headless.service"),
         extend: mode.contains("extend"),
-        credentials: field("Username:").is_some_and(|u| !u.is_empty() && u != "(none)"),
-        port: field("Port:").and_then(|p| p.parse().ok()).unwrap_or(3389),
+        credentials: credentials_present(&text),
+        port: status_field(&text, "Port:")
+            .and_then(|p| p.parse().ok())
+            .unwrap_or(3389),
     }
 }
 
@@ -83,15 +127,24 @@ pub fn enable(username: &str, password: &str, mode: Mode) -> Result<(), String> 
         Mode::Mirror => "mirror-primary",
     };
     if !username.trim().is_empty() {
-        if password.is_empty() || password.len() > 512 || password.contains('\0') {
-            return Err("Enter a sharing password.".into());
+        if username.contains(['\0', '\r', '\n']) {
+            return Err("The sharing name cannot contain line breaks or NUL characters.".into());
         }
-        // `grdctl rdp set-credentials` takes the password as a positional argument and
-        // offers no stdin or file alternative, so it is readable in /proc/<pid>/cmdline
-        // for as long as that one call runs. sh() still never involves a shell, so the
-        // value cannot leak into a history file or a child's environment, and the
-        // command line is never echoed back into an error message.
-        sh("grdctl", &["rdp", "set-credentials", username.trim(), password])?;
+        // `grdctl status` reports one-character values as `(empty)`, so Settings
+        // would treat them as missing after sharing starts.
+        if username.trim().chars().count() < 2 {
+            return Err("Enter a sharing name of at least 2 characters.".into());
+        }
+        if password.chars().count() < 2 || password.len() > 512 || password.contains(['\0', '\r', '\n']) {
+            return Err("Enter a sharing password of 2 to 512 bytes without line breaks.".into());
+        }
+        // Current grdctl reads an omitted password from stdin. Older versions
+        // fail safely; never fall back to exposing it in process arguments.
+        sh_input("grdctl", &["rdp", "set-credentials", username.trim()], password).map_err(|error| {
+            format!(
+                "{error} If your grdctl cannot read passwords from standard input, set the sharing password in GNOME Settings, then refresh."
+            )
+        })?;
     }
     let _ = sh(
         "systemctl",
@@ -145,7 +198,7 @@ pub fn open_settings() -> Result<(), String> {
 
 #[cfg(test)]
 mod tests {
-    use super::sh;
+    use super::{Mode, credentials_present, enable, sh, sh_input};
 
     const SECRET: &str = "dummy-secret-regression-test";
 
@@ -177,5 +230,53 @@ mod tests {
     #[test]
     fn a_successful_command_returns_its_output() {
         assert_eq!(sh("printf", &["%s", "ok"]), Ok("ok".to_owned()));
+    }
+
+    #[test]
+    fn a_secret_arrives_on_stdin_without_becoming_an_argument() {
+        let script = "IFS= read -r value; test \"$value\" = dummy-secret-regression-test && test \"$#\" = 0";
+        assert_eq!(sh_input("sh", &["-c", script, "sh"], SECRET), Ok(()));
+    }
+
+    #[test]
+    fn a_failed_stdin_command_does_not_repeat_its_secret() {
+        let script = "IFS= read -r value; printf '%s' \"$value\"; printf '%s' \"$value\" >&2; exit 7";
+        let error = sh_input("sh", &["-c", script, "sh"], SECRET).unwrap_err();
+        assert!(!error.contains(SECRET));
+        assert!(error.contains('7'));
+    }
+
+    #[test]
+    fn sharing_credentials_cannot_inject_another_input_line() {
+        for password in ["first\nsecond", "first\rsecond", "first\0second"] {
+            assert!(enable("audit-user", password, Mode::Mirror).is_err());
+        }
+        for username in ["first\nsecond", "first\rsecond", "first\0second"] {
+            assert!(enable(username, SECRET, Mode::Mirror).is_err());
+        }
+    }
+
+    #[test]
+    fn one_character_sharing_credentials_are_rejected() {
+        assert!(enable("audit-user", "x", Mode::Mirror).is_err());
+        assert!(enable(" a ", SECRET, Mode::Mirror).is_err());
+    }
+
+    #[test]
+    fn empty_or_partial_sharing_credentials_are_not_treated_as_configured() {
+        for missing in ["", "(none)", "(empty)", "(null)"] {
+            assert!(!credentials_present(&format!(
+                "RDP:\n\tUsername: {missing}\n\tPassword: (hidden)\n"
+            )));
+            assert!(!credentials_present(&format!(
+                "RDP:\n\tUsername: (hidden)\n\tPassword: {missing}\n"
+            )));
+        }
+        assert!(!credentials_present("RDP:\n\tUsername: (hidden)\n"));
+        assert!(!credentials_present("RDP:\n\tPassword: (hidden)\n"));
+        // GNOME 46.2 and current releases both mask configured values this way.
+        assert!(credentials_present(
+            "RDP:\n\tUsername: (hidden)\n\tPassword: (hidden)\n"
+        ));
     }
 }

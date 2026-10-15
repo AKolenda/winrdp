@@ -6,7 +6,8 @@
 use ab_glyph::FontVec;
 use winit::dpi::PhysicalSize;
 
-use crate::drawing::{blend_rect, draw_text, fill, load_font, outline, rounded_fill, text_width};
+use crate::damage::Rect;
+use crate::drawing::{draw_text, fill, load_font, outline, rounded_fill, text_width};
 
 /// What the user chose.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -27,7 +28,6 @@ const TITLE_PX: f32 = 14.5;
 const TEXT_PX: f32 = 13.5;
 
 // Windows 11 light dialog palette.
-const DIM: u32 = 0x00_00_00_00;
 const PANEL: u32 = 0x00_f9_f9_f9;
 const FOOTER: u32 = 0x00_f0_f0_f0;
 const BORDER: u32 = 0x00_d6_d6_d6;
@@ -87,6 +87,19 @@ impl CloseDialog {
         size.width as usize >= WIDTH + 8 && size.height as usize >= BODY_HEIGHT + FOOTER_HEIGHT + 8
     }
 
+    /// The opaque panel; the desktop behind it is dimmed separately as it changes.
+    pub(crate) fn bounds(size: PhysicalSize<u32>) -> Option<Rect> {
+        Self::fits(size).then(|| {
+            let (left, top) = Self::origin(size);
+            Rect {
+                x: left as u32,
+                y: top as u32,
+                width: WIDTH as u32,
+                height: (BODY_HEIGHT + FOOTER_HEIGHT) as u32,
+            }
+        })
+    }
+
     fn hit(size: PhysicalSize<u32>, x: f64, y: f64) -> Option<Choice> {
         if !Self::fits(size) {
             return None;
@@ -112,15 +125,13 @@ impl CloseDialog {
 
     pub fn paint(&self, pixels: &mut [u32], size: PhysicalSize<u32>) {
         let stride = size.width as usize;
-        let (w, h) = (size.width as usize, size.height as usize);
         if !Self::fits(size) {
             return;
         }
-        // Dim the desktop so the dialog reads as modal.
-        blend_rect(pixels, stride, 0, 0, w, h, DIM, 0.42);
 
         let (left, top) = Self::origin(size);
         let (right, bottom) = (left + WIDTH, top + BODY_HEIGHT + FOOTER_HEIGHT);
+        let text_size = PhysicalSize::new((right - PAD) as u32, size.height);
         rounded_fill(pixels, stride, left, top, right, bottom, RADIUS, PANEL);
         fill(pixels, stride, left, top + BODY_HEIGHT, WIDTH, 1, BORDER);
         // Footer strip with rounded bottom corners (the fill's top corners are hidden under the body).
@@ -151,7 +162,7 @@ impl CloseDialog {
             font,
             pixels,
             stride,
-            size,
+            text_size,
             left + PAD,
             top + 18,
             22,
@@ -164,7 +175,7 @@ impl CloseDialog {
             font,
             pixels,
             stride,
-            size,
+            text_size,
             left + PAD,
             top + 52,
             20,
@@ -177,7 +188,7 @@ impl CloseDialog {
             font,
             pixels,
             stride,
-            size,
+            text_size,
             left + PAD,
             top + 74,
             20,
@@ -207,7 +218,7 @@ impl CloseDialog {
                 font,
                 pixels,
                 stride,
-                size,
+                text_size,
                 tx,
                 y0,
                 y1 - y0,
@@ -266,5 +277,21 @@ mod tests {
         assert!(dialog.pointer_moved(full, cx, cy), "entering the button repaints");
         assert!(!dialog.pointer_moved(full, cx + 1.0, cy), "staying on it does not");
         assert!(dialog.pointer_moved(full, 1.0, 1.0), "leaving it repaints");
+    }
+
+    #[test]
+    fn a_long_computer_name_stays_inside_the_damaged_panel() {
+        let size = size(1280, 720);
+        let bounds = CloseDialog::bounds(size).expect("the panel fits");
+        let background = 0x12_34_56;
+        let mut pixels = vec![background; (size.width * size.height) as usize];
+        CloseDialog::new("W".repeat(100)).paint(&mut pixels, size);
+        for y in 0..size.height {
+            for x in 0..size.width {
+                if x < bounds.x || x >= bounds.x + bounds.width || y < bounds.y || y >= bounds.y + bounds.height {
+                    assert_eq!(pixels[(y * size.width + x) as usize], background);
+                }
+            }
+        }
     }
 }

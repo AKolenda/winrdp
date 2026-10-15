@@ -6,6 +6,8 @@
 use ab_glyph::{Font as _, FontVec, PxScale, ScaleFont as _, point};
 use winit::dpi::PhysicalSize;
 
+use crate::damage::Rect;
+
 const FONT_CANDIDATES: &[&str] = &[
     "/usr/share/fonts/truetype/ubuntu/Ubuntu-R.ttf",
     "/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf",
@@ -110,22 +112,14 @@ pub(crate) fn draw_text(
     advance.ceil() as usize
 }
 
-/// Mix `color` over the rectangle at `coverage` (0..=1).
-#[allow(clippy::too_many_arguments)]
-pub(crate) fn blend_rect(
-    pixels: &mut [u32],
-    stride: usize,
-    x: usize,
-    y: usize,
-    w: usize,
-    h: usize,
-    color: u32,
-    coverage: f32,
-) {
-    for yy in y..y + h {
-        for xx in x..x + w {
-            let index = yy * stride + xx;
-            pixels[index] = blend(pixels[index], color, coverage);
+/// Darken a freshly copied rectangle by 42% for the close dialog. Integer
+/// arithmetic avoids three floating-point round operations for every pixel.
+pub(crate) fn dim_rect(pixels: &mut [u32], stride: usize, rect: Rect) {
+    for y in rect.y as usize..(rect.y + rect.height) as usize {
+        let start = y * stride + rect.x as usize;
+        for pixel in &mut pixels[start..start + rect.width as usize] {
+            let channel = |shift: u32| (((*pixel >> shift) & 0xFF) * 58 + 50) / 100;
+            *pixel = channel(16) << 16 | channel(8) << 8 | channel(0);
         }
     }
 }
@@ -326,5 +320,24 @@ mod tests {
             false,
         );
         assert_eq!(advance, text_width(None, 13.5, "A"));
+    }
+
+    #[test]
+    fn integer_dimming_retains_the_existing_color_and_clips_to_its_rect() {
+        let mut pixels: Vec<u32> = (0..=255).map(|value| value * 0x01_01_01).collect();
+        let expected: Vec<_> = pixels.iter().map(|&pixel| super::blend(pixel, 0, 0.42)).collect();
+        super::dim_rect(
+            &mut pixels,
+            256,
+            crate::damage::Rect {
+                x: 1,
+                y: 0,
+                width: 254,
+                height: 1,
+            },
+        );
+        assert_eq!(&pixels[1..255], &expected[1..255]);
+        assert_eq!(pixels[0], 0);
+        assert_eq!(pixels[255], 0xFF_FF_FF);
     }
 }

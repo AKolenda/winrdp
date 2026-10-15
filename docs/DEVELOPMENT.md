@@ -28,6 +28,7 @@ These also run in CI. See [BUILDING.md](../BUILDING.md) for system dependencies.
 | `session/src/app.rs` | Native window events and presentation orchestration. |
 | `session/src/damage.rs` | Clipped rectangles, buffer-age history and pixel copies. |
 | `session/src/drawing.rs` | Shared software drawing and text primitives. |
+| `session/src/input.rs` | Bounded input delivery, backpressure and releasing held keys/buttons. |
 | `session/src/status.rs` | Session reports and connection-error classification. |
 | `session/src/keymap.rs` | Physical-key to RDP scan-code mapping. |
 | `xtask/src/` | Build, package, source checks, branding and website commands. |
@@ -42,6 +43,14 @@ Share connection-option state and controls between layouts. Keep reusable pixel
 operations independent of the connection bar and dialogs. Avoid making an
 abstraction generic unless there are callers that need that flexibility.
 
+Keyring requests must not block the window. Queue credential operations in action
+order and return their results through messages. Bind a remembered password to the
+profile identifier, destination and account; an edited destination must never reuse
+the old account's secret, even if deleting it fails. Ignore stale lookup results
+after the user types, cancels, edits or removes the target profile. Serialize host
+sharing operations as well: a mode change must not restart sharing while a disable
+request is pending. Sharing passwords travel over stdin, never process arguments.
+
 ## Rendering contract
 
 The session and the client share a persistent framebuffer. Notifications carry no
@@ -50,7 +59,9 @@ Replacing a queued notification must not discard pending pixels.
 
 Acquire compositor buffers before locking the shared framebuffer. Hold its lock
 only while inspecting frame state and copying pixels; release it before drawing
-overlays or presenting. Compositor waits must not block the protocol thread.
+overlays, scaling or presenting. Scaled presentation keeps a private source copy
+and refreshes its dirty pixels under the lock. Compositor waits and software
+filtering must not block the protocol thread.
 
 Damage history tracks both buffer age and desktop/window dimensions. Resizing,
 unknown buffer contents and expired history require a full copy. Overlay damage

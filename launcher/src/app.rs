@@ -4,6 +4,8 @@
 //! `connections`. The shared UI types are in `model`, and drawing is in `crate::view`.
 mod computers;
 mod connections;
+#[cfg(test)]
+mod host_tests;
 mod model;
 
 pub use model::{
@@ -18,7 +20,7 @@ use iced::keyboard::{self, Key, key::Named};
 use iced::widget::{Id, operation};
 use iced::{Size, Subscription, Task, event, window};
 
-use crate::backend::Backend;
+use crate::backend::{Backend, Credentials};
 use crate::host;
 use crate::library::{Layout, Library, Preferences, Profile, parse_iso};
 use crate::style::{self, Tokens};
@@ -54,6 +56,7 @@ pub struct App {
     pub dialogs: Vec<Dialog>,
     pub toast: Option<Toast>,
     toast_seq: u64,
+    credential_seq: u64,
     pub host: HostPanel,
     quitting: bool,
     pub window: Option<window::Id>,
@@ -115,6 +118,7 @@ impl App {
             dialogs: Vec::new(),
             toast: None,
             toast_seq: 0,
+            credential_seq: 0,
             host: HostPanel::default(),
             quitting: false,
             window: None,
@@ -131,6 +135,14 @@ impl App {
     }
     pub fn title(&self) -> String {
         "Win RDP".into()
+    }
+    fn credential_request(&mut self) -> u64 {
+        self.credential_seq += 1;
+        self.credential_seq
+    }
+    fn current_credentials(&self, credentials: &Credentials) -> bool {
+        self.profile(&credentials.profile_id)
+            .is_some_and(|profile| Credentials::from(profile) == *credentials)
     }
     /// Shows a self-dismissing notice; longer when it carries detail lines.
     fn notify(&mut self, text: impl Into<String>) -> Task<Message> {
@@ -206,6 +218,9 @@ impl App {
             .chain(window::close(old))
     }
     fn refresh_host(&mut self) -> Task<Message> {
+        if self.host.busy {
+            return Task::none();
+        }
         self.host.busy = true;
         Task::perform(
             async { tokio::task::spawn_blocking(host::status).await.unwrap_or_default() },
@@ -214,6 +229,9 @@ impl App {
     }
     /// Turns sharing on, then reads the status back, so what the user is told is what happened.
     fn enable_host(&mut self, username: String) -> Task<Message> {
+        if self.host.busy {
+            return Task::none();
+        }
         let password = std::mem::take(&mut self.host.pass);
         let mode = self.host.mode.unwrap_or_default();
         self.host.busy = true;
@@ -257,6 +275,10 @@ impl App {
                 | Message::HostLoaded(_)
                 | Message::HostEnabled(_)
                 | Message::HostDisabled(_)
+                | Message::PasswordLoaded { .. }
+                | Message::PasswordPresence { .. }
+                | Message::PasswordStored { .. }
+                | Message::PasswordForgotten { .. }
         ) {
             self.combo_open = false;
         }
@@ -374,14 +396,8 @@ impl App {
                 self.with_form(|f| f.name = v);
                 Task::none()
             }
-            Message::FormAddress(v) => {
-                self.with_form(|f| f.address = v);
-                Task::none()
-            }
-            Message::FormUsername(v) => {
-                self.with_form(|f| f.username = v);
-                Task::none()
-            }
+            Message::FormAddress(v) => self.edit_form_credentials(|form| form.address = v),
+            Message::FormUsername(v) => self.edit_form_credentials(|form| form.username = v),
             Message::FormConnectionOption(which, on) => {
                 self.with_form(|form| form.options.set(which, on));
                 Task::none()
@@ -410,18 +426,21 @@ impl App {
             }
             Message::PasswordInput(v) => {
                 if let Some(Dialog::Password(f)) = self.dialogs.last_mut() {
+                    f.lookup = None;
                     f.password = v;
                 }
                 Task::none()
             }
             Message::PasswordFullscreen(on) => {
                 if let Some(Dialog::Password(f)) = self.dialogs.last_mut() {
+                    f.lookup = None;
                     f.fullscreen = on;
                 }
                 Task::none()
             }
             Message::PasswordRemember(on) => {
                 if let Some(Dialog::Password(f)) = self.dialogs.last_mut() {
+                    f.lookup = None;
                     f.remember = on;
                 }
                 Task::none()
@@ -432,6 +451,25 @@ impl App {
                 }
                 self.submit_password()
             }
+            Message::PasswordLoaded {
+                request,
+                credentials,
+                result,
+            } => self.password_loaded(request, &credentials, result),
+            Message::PasswordPresence {
+                request,
+                credentials,
+                result,
+            } => {
+                self.password_presence(request, &credentials, result);
+                Task::none()
+            }
+            Message::PasswordStored { credentials, result } => self.password_stored(credentials, result),
+            Message::PasswordForgotten {
+                request,
+                credentials,
+                result,
+            } => self.password_forgotten(request, &credentials, result),
             Message::ConfirmYes => {
                 let Some(Dialog::Confirm(confirm)) = self.dialogs.pop() else {
                     return Task::none();
@@ -442,18 +480,18 @@ impl App {
                         Task::none()
                     }
                     Confirmed::Remove(id) => {
+                        let credentials = self.profile(&id).map(Credentials::from);
                         let library = match self.backend.delete_profile(&id) {
                             Ok(library) => library,
                             Err(error) => return self.notify(error),
                         };
-                        let _ = self.backend.forget_password(&id);
                         if self.chosen.as_deref() == Some(id.as_str()) {
                             self.chosen = None;
                             self.computer_box.clear();
                         }
                         self.library = library;
                         self.resync();
-                        Task::none()
+                        credentials.map_or_else(Task::none, |key| self.forget_credentials(key, None))
                     }
                     Confirmed::Quit => self.quit(),
                 }
@@ -492,14 +530,25 @@ impl App {
                 })
             }
             Message::HostDisabled(Ok(status)) => {
+                let still_on = status.sharing;
+                let checked = status.available;
                 self.host_loaded(status);
-                self.notify("Sharing is off.")
+                self.notify(if still_on {
+                    "Sharing is still on. Open GNOME\u{2019}s Remote Desktop settings to check."
+                } else if !checked {
+                    "Could not confirm that sharing is off. Open GNOME\u{2019}s Remote Desktop settings to check."
+                } else {
+                    "Sharing is off."
+                })
             }
             Message::HostEnabled(Err(e)) | Message::HostDisabled(Err(e)) => {
                 self.host.busy = false;
                 Task::batch([self.notify(e), self.refresh_host()])
             }
             Message::HostSwitch(on) => {
+                if self.host.busy {
+                    return Task::none();
+                }
                 let Some(status) = self.host.status.clone().filter(|s| s.available) else {
                     return Task::none();
                 };
@@ -526,6 +575,11 @@ impl App {
                 self.enable_host(String::new())
             }
             Message::HostMode(mode) => {
+                // A pending disable still has the previous "sharing on" status.
+                // Starting an enable here could undo the user's shutdown request.
+                if self.host.busy {
+                    return Task::none();
+                }
                 self.host.mode = Some(mode);
                 let status = self.host.status.clone().unwrap_or_default();
                 if status.sharing && status.credentials {
@@ -544,6 +598,9 @@ impl App {
             }
             Message::HostSubmit => {
                 let user = self.host.user.trim().to_owned();
+                if self.host.busy || !self.host.needs_credentials() || user.is_empty() || self.host.pass.is_empty() {
+                    return Task::none();
+                }
                 self.enable_host(user)
             }
             Message::HostOpenSettings => match host::open_settings() {
@@ -590,7 +647,11 @@ impl App {
 
     pub fn subscription(&self) -> Subscription<Message> {
         Subscription::batch([
-            iced::time::every(Duration::from_millis(250)).map(|_| Message::Tick),
+            if self.sessions.is_empty() {
+                Subscription::none()
+            } else {
+                iced::time::every(Duration::from_millis(250)).map(|_| Message::Tick)
+            },
             window::close_requests().map(|_| Message::CloseRequested),
             event::listen_with(|event, status, _window| match event {
                 iced::Event::Keyboard(keyboard::Event::KeyPressed { key, modifiers, .. }) => {
