@@ -805,8 +805,8 @@ impl RpcApp {
                     self.keep_resolution,
                 );
                 let Some((x, y)) = on_desktop else {
-                    // Over the black padding or bars beside the desktop.
-                    self.input.release_buttons(&self.input_target);
+                    // Over the black padding or bars beside the desktop. Keep held
+                    // buttons down: a drag past the edge ends with its real release.
                     return;
                 };
                 let operation = ironrdp::input::Operation::MouseMove(ironrdp::input::MousePosition { x, y });

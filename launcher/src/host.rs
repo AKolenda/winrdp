@@ -130,8 +130,13 @@ pub fn enable(username: &str, password: &str, mode: Mode) -> Result<(), String> 
         if username.contains(['\0', '\r', '\n']) {
             return Err("The sharing name cannot contain line breaks or NUL characters.".into());
         }
-        if password.is_empty() || password.len() > 512 || password.contains(['\0', '\r', '\n']) {
-            return Err("Enter a sharing password of up to 512 bytes without line breaks.".into());
+        // `grdctl status` reports one-character values as `(empty)`, so Settings
+        // would treat them as missing after sharing starts.
+        if username.trim().chars().count() < 2 {
+            return Err("Enter a sharing name of at least 2 characters.".into());
+        }
+        if password.chars().count() < 2 || password.len() > 512 || password.contains(['\0', '\r', '\n']) {
+            return Err("Enter a sharing password of 2 to 512 bytes without line breaks.".into());
         }
         // Current grdctl reads an omitted password from stdin. Older versions
         // fail safely; never fall back to exposing it in process arguments.
@@ -249,6 +254,12 @@ mod tests {
         for username in ["first\nsecond", "first\rsecond", "first\0second"] {
             assert!(enable(username, SECRET, Mode::Mirror).is_err());
         }
+    }
+
+    #[test]
+    fn one_character_sharing_credentials_are_rejected() {
+        assert!(enable("audit-user", "x", Mode::Mirror).is_err());
+        assert!(enable(" a ", SECRET, Mode::Mirror).is_err());
     }
 
     #[test]
