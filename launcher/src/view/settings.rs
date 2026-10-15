@@ -120,7 +120,11 @@ pub(super) fn view(app: &App, t: Tokens) -> Element<'_> {
         container(switch_row(
             t,
             "Accept connections from Windows",
-            Some(summary),
+            Some(if host.busy {
+                "Updating sharing settings\u{2026}".into()
+            } else {
+                summary
+            }),
             on,
             (status.available && !host.busy).then_some(Message::HostSwitch),
         ))
@@ -130,7 +134,7 @@ pub(super) fn view(app: &App, t: Tokens) -> Element<'_> {
     if !explanation.is_empty() {
         host_rows.push(container(label(explanation, 13.0, t.ink)).padding([10, 0]).into());
     }
-    if status.available {
+    if status.available && !host.busy {
         host_rows.push(
             column![
                 choice_row(
@@ -153,7 +157,7 @@ pub(super) fn view(app: &App, t: Tokens) -> Element<'_> {
             .into(),
         );
     }
-    if host.needs_credentials() {
+    if host.needs_credentials() && !host.busy {
         host_rows.push(
             row![
                 field_label(

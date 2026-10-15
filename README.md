@@ -82,6 +82,10 @@ desktop's keyring (GNOME Keyring or KWallet, through the Secret Service), never 
 RDP's files. A remembered password that Windows refuses is forgotten, and Edit shows a
 Forget button while one is saved.
 
+Remembered passwords are bound to the computer's address and account. Passwords
+saved by older versions without that binding require one fresh sign-in; select
+**Remember this password** again to save them in the new format.
+
 ![The full launcher layout with a sidebar, search, and saved computers](docs/screenshots/launcher-full.png)
 
 
@@ -136,6 +140,10 @@ give Windows a separate login session instead of your screen. Hosting is opt-in:
 "Virtual screen" gives the same signed-in session its own screen and works with the
 monitor off or unplugged. Connections into the machine are TCP; hosting over RDP-UDP is
 not built yet.
+
+Sharing passwords are passed to `grdctl` through standard input. If an older GNOME
+release does not support this, set the sharing password in GNOME's Remote Desktop
+settings, then refresh Win RDP's Settings.
 
 [MS-RDPEUDP]: https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-rdpeudp/
 [MS-RDPEUDP2]: https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-rdpeudp2/

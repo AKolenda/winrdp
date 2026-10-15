@@ -19,6 +19,7 @@ use winit::keyboard::{KeyCode, PhysicalKey};
 use winit::window::{CursorIcon, CustomCursor, Window, WindowAttributes};
 
 use crate::damage::{self, Damage, Layout, Rect};
+use crate::input::{InputQueue, InputTarget};
 use crate::status::{
     Failure, connect_failure, transport_label, write_closed_status, write_failure_status, write_status_file,
 };
@@ -31,12 +32,6 @@ type WindowSurface = (Arc<Window>, softbuffer::Surface<OwnedDisplayHandle, Arc<W
 pub enum ViewerEvent {
     FrameAvailable,
     Shutdown,
-}
-
-/// Where local window input is sent.
-enum InputTarget {
-    Direct(RdpInputSender),
-    Rpc(Arc<Daemon>),
 }
 
 /// A viewer application driven by the RDP client's native output events.
@@ -59,9 +54,13 @@ pub struct RpcApp {
     desktop_size: (u16, u16),
     /// What recent presents changed, to bring an older softbuffer buffer up to date.
     history: damage::History,
+    /// Source pixels for scaling after releasing the protocol thread's frame lock.
+    scaled_frame: Option<damage::FrameCache>,
     /// The window areas the connection bar and the close dialog covered in the last present.
     overlays: Damage,
-    input_database: ironrdp::input::Database,
+    /// Whether the last present dimmed the desktop for the close dialog.
+    dialog_visible: bool,
+    input: InputQueue,
     last_size: Option<PhysicalSize<u32>>,
     resize_timeout: Option<Instant>,
     /// Keyboard modifiers as last reported by winit, for the local shortcuts.
@@ -132,6 +131,34 @@ fn remote_pointer(position: (f64, f64), desktop: (u16, u16)) -> Option<(u16, u16
     }
     #[expect(clippy::as_conversions, reason = "bounded above by the desktop size")]
     Some((x as u16, y as u16))
+}
+
+fn desktop_pointer(
+    position: (f64, f64),
+    window: PhysicalSize<u32>,
+    desktop: (u16, u16),
+    keep_resolution: bool,
+) -> Option<(u16, u16)> {
+    if keep_resolution {
+        damage::Fit::new(window, desktop)
+            .map_or_else(|| remote_pointer(position, desktop), |fit| fit.to_desktop(position))
+    } else {
+        remote_pointer(position, desktop)
+    }
+}
+
+fn overlay_damage(
+    size: PhysicalSize<u32>,
+    current: &Damage,
+    previous: &Damage,
+    dimmed: bool,
+    was_dimmed: bool,
+) -> Damage {
+    if dimmed != was_dimmed {
+        smallvec::smallvec![Rect::covering(size)]
+    } else {
+        current.iter().chain(previous).copied().collect()
+    }
 }
 
 /// The desktop-file identity shared with the launcher (`StartupWMClass` in
@@ -243,7 +270,6 @@ impl RpcApp {
         let context = softbuffer::Context::new(event_loop.owned_display_handle())
             .map_err(|e| anyhow::anyhow!("unable to initialize softbuffer context: {e}"))?;
 
-        let input_database = ironrdp::input::Database::new();
         Ok(Self {
             input_target,
             frame_wakeup,
@@ -253,8 +279,10 @@ impl RpcApp {
             frame,
             desktop_size: (0, 0),
             history: damage::History::default(),
+            scaled_frame: None,
             overlays: Damage::new(),
-            input_database,
+            dialog_visible: false,
+            input: InputQueue::default(),
             last_size: None,
             resize_timeout: None,
             modifiers: winit::keyboard::ModifiersState::empty(),
@@ -386,10 +414,12 @@ impl RpcApp {
                 .clip(size),
             );
         }
-        if self.close_dialog.is_some() {
-            // It dims the whole desktop.
-            overlays.push(Rect::covering(size));
-        }
+        let dialog_bounds = self
+            .close_dialog
+            .as_ref()
+            .and_then(|_| crate::modal::CloseDialog::bounds(size));
+        let dialog_visible = dialog_bounds.is_some();
+        overlays.extend(dialog_bounds);
         let mut frame = self.frame.lock();
         self.desktop_size = (frame.width(), frame.height());
         if self.desktop_size == (0, 0) {
@@ -397,7 +427,7 @@ impl RpcApp {
             return Ok(());
         }
         // A frame update with nothing left to paint: an earlier draw already took it.
-        let dirty = frame.take_dirty();
+        let dirty = frame.take_dirty().map(|dirty| Rect::from(&dirty));
         if present == Present::Changes && dirty.is_none() {
             return Ok(());
         }
@@ -411,13 +441,16 @@ impl RpcApp {
         // An overlay is repainted whole over the frame, and where one was painted last
         // time the frame has to show again.
         let mut changed: Damage = dirty
-            .and_then(|dirty| {
-                let rect = Rect::from(&dirty);
-                fit.map_or(rect, |fit| fit.to_window(rect)).clip(size)
-            })
+            .and_then(|rect| fit.map_or(rect, |fit| fit.to_window(rect)).clip(size))
             .into_iter()
             .collect();
-        changed.extend(overlays.iter().chain(&self.overlays).copied());
+        changed.extend(overlay_damage(
+            size,
+            &overlays,
+            &self.overlays,
+            dialog_visible,
+            self.dialog_visible,
+        ));
 
         let layout = Layout {
             window: size,
@@ -427,17 +460,29 @@ impl RpcApp {
             .history
             .plan(buffer.age(), layout, &changed, present == Present::Everything);
         let frame_size = (usize::from(self.desktop_size.0), usize::from(self.desktop_size.1));
-        for rect in &plan.copy {
-            match fit {
-                Some(fit) => damage::blit_scaled(&mut buffer, size.width as usize, frame.pixels(), fit, *rect),
-                None => damage::blit(&mut buffer, size.width as usize, frame.pixels(), frame_size, *rect),
+        if let Some(fit) = fit {
+            let cache = self.scaled_frame.get_or_insert_with(damage::FrameCache::default);
+            cache.update(frame.pixels(), self.desktop_size, dirty);
+            drop(frame);
+            for rect in &plan.copy {
+                damage::blit_scaled(&mut buffer, size.width as usize, cache.pixels(), fit, *rect);
             }
+        } else {
+            for rect in &plan.copy {
+                damage::blit(&mut buffer, size.width as usize, frame.pixels(), frame_size, *rect);
+            }
+            drop(frame);
+            // Updates consumed while drawing 1:1 must not leave a stale scaled copy.
+            self.scaled_frame = None;
         }
-        // The session waits on the frame to apply its next update; the rest needs none of it.
-        drop(frame);
 
         if bar_shown {
             self.bar.paint(&mut buffer, size);
+        }
+        if dialog_visible {
+            for rect in &plan.copy {
+                crate::drawing::dim_rect(&mut buffer, size.width as usize, *rect);
+            }
         }
         if let Some(dialog) = self.close_dialog.as_ref() {
             dialog.paint(&mut buffer, size);
@@ -447,6 +492,7 @@ impl RpcApp {
         buffer.present_with_damage(&rects)?;
         self.history.record(layout, plan.present);
         self.overlays = overlays;
+        self.dialog_visible = dialog_visible;
         self.frame.lock().record_present(started.elapsed());
         Ok(())
     }
@@ -487,6 +533,7 @@ impl RpcApp {
             return;
         }
         let computer = std::env::var("WINRDP_TITLE").unwrap_or_else(|_| "this computer".to_owned());
+        self.input.release_all(&self.input_target);
         self.close_dialog = Some(crate::modal::CloseDialog::new(computer));
         window.request_redraw();
     }
@@ -511,6 +558,7 @@ impl RpcApp {
             | WindowEvent::CloseRequested
             | WindowEvent::Destroyed
             | WindowEvent::Focused(_)
+            | WindowEvent::ModifiersChanged(_)
             | WindowEvent::Moved(_)
             | WindowEvent::ScaleFactorChanged { .. } => DialogOutcome::NotShown,
             WindowEvent::CursorMoved { position, .. } => {
@@ -555,6 +603,9 @@ impl RpcApp {
     }
     fn on_about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
         let now = Instant::now();
+        if self.input.deadline().is_some_and(|deadline| deadline <= now) {
+            self.input.flush(&self.input_target);
+        }
         if self.resize_timeout.is_some_and(|timeout| timeout <= now) {
             self.resize_timeout = None;
             self.send_resize_event();
@@ -564,7 +615,10 @@ impl RpcApp {
         {
             window.request_redraw();
         }
-        let next = [self.resize_timeout, self.bar.deadline()].into_iter().flatten().min();
+        let next = [self.resize_timeout, self.bar.deadline(), self.input.deadline()]
+            .into_iter()
+            .flatten()
+            .min();
         event_loop.set_control_flow(match next {
             Some(deadline) => ControlFlow::wait_duration(deadline.saturating_duration_since(now)),
             None => ControlFlow::Wait,
@@ -638,6 +692,9 @@ impl RpcApp {
 
         match event {
             WindowEvent::Resized(size) => {
+                if self.close_dialog.is_some() && !crate::modal::CloseDialog::fits(size) {
+                    self.close_dialog = None;
+                }
                 // Maximizing from the title bar means "fill the screen": go borderless full
                 // screen with the connection bar instead of keeping the desktop's title bar.
                 if window.is_maximized() && window.fullscreen().is_none() {
@@ -715,7 +772,7 @@ impl RpcApp {
                     }
                 };
 
-                apply_and_send_fast_path_events(&self.input_target, &mut self.input_database, operations);
+                self.input.send(&self.input_target, operations);
             }
 
             WindowEvent::ModifiersChanged(modifiers) => {
@@ -726,17 +783,7 @@ impl RpcApp {
                 // The key-up may be delivered to a different local window after
                 // Alt+Tab. Release held inputs so the remote is not left with Ctrl
                 // or Alt stuck down when this window regains focus.
-                let keys = self.input_database.keyboard_state();
-                let operations = keys
-                    .iter_ones()
-                    .map(|index| {
-                        ironrdp::input::Operation::KeyReleased(ironrdp::input::Scancode::from_u8(
-                            index >= 256,
-                            index as u8,
-                        ))
-                    })
-                    .collect::<Vec<_>>();
-                apply_and_send_fast_path_events(&self.input_target, &mut self.input_database, operations);
+                self.input.release_all(&self.input_target);
             }
             WindowEvent::CursorMoved { position, .. } => {
                 let win_size = window.inner_size();
@@ -747,31 +794,37 @@ impl RpcApp {
                     }
                     if captured {
                         // The bar owns the pointer; the remote desktop does not see it.
+                        self.input.release_buttons(&self.input_target);
                         return;
                     }
                 }
-                let position = (position.x, position.y);
-                let on_desktop = if self.keep_resolution {
-                    damage::Fit::new(win_size, self.desktop_size).map_or_else(
-                        || remote_pointer(position, self.desktop_size),
-                        |fit| fit.to_desktop(position),
-                    )
-                } else {
-                    remote_pointer(position, self.desktop_size)
-                };
+                let on_desktop = desktop_pointer(
+                    (position.x, position.y),
+                    win_size,
+                    self.desktop_size,
+                    self.keep_resolution,
+                );
                 let Some((x, y)) = on_desktop else {
                     // Over the black padding or bars beside the desktop.
+                    self.input.release_buttons(&self.input_target);
                     return;
                 };
                 let operation = ironrdp::input::Operation::MouseMove(ironrdp::input::MousePosition { x, y });
 
-                apply_and_send_fast_path_events(
-                    &self.input_target,
-                    &mut self.input_database,
-                    core::iter::once(operation),
-                );
+                self.input.send(&self.input_target, core::iter::once(operation));
             }
             WindowEvent::MouseWheel { delta, .. } => {
+                if (window.fullscreen().is_some() && self.bar.is_shown() && self.bar.hovered())
+                    || desktop_pointer(
+                        self.pointer,
+                        window.inner_size(),
+                        self.desktop_size,
+                        self.keep_resolution,
+                    )
+                    .is_none()
+                {
+                    return;
+                }
                 let mut operations = SmallVec::<[ironrdp::input::Operation; 2]>::new();
 
                 match delta {
@@ -819,9 +872,10 @@ impl RpcApp {
                     }
                 };
 
-                apply_and_send_fast_path_events(&self.input_target, &mut self.input_database, operations);
+                self.input.send(&self.input_target, operations);
             }
             WindowEvent::MouseInput { state, button, .. } if self.bar.is_shown() && self.bar.hovered() => {
+                self.input.release_buttons(&self.input_target);
                 if button == event::MouseButton::Left && state == event::ElementState::Pressed {
                     match self.bar.click(Instant::now()) {
                         Some(crate::bar::Hit::Restore) => self.toggle_fullscreen(),
@@ -832,6 +886,17 @@ impl RpcApp {
                 }
             }
             WindowEvent::MouseInput { state, button, .. } => {
+                if state == event::ElementState::Pressed
+                    && desktop_pointer(
+                        self.pointer,
+                        window.inner_size(),
+                        self.desktop_size,
+                        self.keep_resolution,
+                    )
+                    .is_none()
+                {
+                    return;
+                }
                 let mouse_button = match button {
                     event::MouseButton::Left => ironrdp::input::MouseButton::Left,
                     event::MouseButton::Right => ironrdp::input::MouseButton::Right,
@@ -852,11 +917,7 @@ impl RpcApp {
                     event::ElementState::Released => ironrdp::input::Operation::MouseButtonReleased(mouse_button),
                 };
 
-                apply_and_send_fast_path_events(
-                    &self.input_target,
-                    &mut self.input_database,
-                    core::iter::once(operation),
-                );
+                self.input.send(&self.input_target, core::iter::once(operation));
             }
             WindowEvent::CursorLeft { .. } => {
                 if self.bar.pointer_left(Instant::now()) {
@@ -1097,30 +1158,11 @@ impl ApplicationHandler<RdpOutputEvent> for App {
     }
 }
 
-fn apply_and_send_fast_path_events(
-    input_target: &InputTarget,
-    input_database: &mut ironrdp::input::Database,
-    operations: impl IntoIterator<Item = ironrdp::input::Operation>,
-) {
-    match input_target {
-        InputTarget::Direct(input_event_sender) => {
-            let Ok(permit) = input_event_sender.try_reserve() else {
-                return;
-            };
-            let input_events = input_database.apply(operations);
-            if !input_events.is_empty() {
-                permit.send(RdpInputEvent::FastPath(input_events));
-            }
-        }
-        InputTarget::Rpc(daemon) => {
-            let _ = daemon.input_operations(operations);
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use super::{CloseKind, close_kind, remote_pointer};
+    use super::{CloseKind, close_kind, desktop_pointer, overlay_damage, remote_pointer};
+    use crate::damage::{Damage, History, Layout, Rect};
+    use winit::dpi::PhysicalSize;
 
     #[test]
     fn closing_before_the_desktop_arrives_cancels_the_connection_attempt() {
@@ -1140,5 +1182,43 @@ mod tests {
         assert_eq!(remote_pointer((-1.0, 10.0), (1280, 720)), None);
         // A window smaller than the desktop clips the frame; every position is on it.
         assert_eq!(remote_pointer((799.0, 599.0), (1280, 720)), Some((799, 599)));
+    }
+
+    #[test]
+    fn clicks_and_wheels_have_no_remote_target_in_letterboxing_or_padding() {
+        let window = PhysicalSize::new(1600, 1200);
+        assert_eq!(desktop_pointer((800.0, 20.0), window, (1920, 1080), true), None);
+        assert_eq!(
+            desktop_pointer((800.0, 600.0), window, (1920, 1080), true),
+            Some((960, 540))
+        );
+        assert_eq!(desktop_pointer((1500.0, 800.0), window, (1280, 720), false), None);
+    }
+
+    #[test]
+    fn modal_transitions_repaint_the_desktop_and_steady_updates_only_the_panel() {
+        let size = PhysicalSize::new(1280, 720);
+        let layout = Layout {
+            window: size,
+            desktop: (1280, 720),
+        };
+        let whole = Rect::covering(size);
+        let panel = smallvec::smallvec![crate::modal::CloseDialog::bounds(size).expect("the panel fits")];
+        let empty = Damage::new();
+        let show = overlay_damage(size, &panel, &empty, true, false);
+        assert_eq!(show.as_slice(), &[whole]);
+        let steady = overlay_damage(size, &panel, &panel, true, true);
+        assert!(steady.iter().all(|rect| *rect == panel[0]));
+        let hide = overlay_damage(size, &empty, &panel, false, true);
+        assert_eq!(hide.as_slice(), &[whole]);
+
+        let mut history = History::default();
+        history.record(layout, show);
+        history.record(layout, steady);
+        let hiding = history.plan(2, layout, &hide, false);
+        assert_eq!(hiding.copy.as_slice(), &[whole]);
+        history.record(layout, hiding.present);
+        // The other compositor buffer must also lose its old dimming.
+        assert_eq!(history.plan(2, layout, &empty, false).copy.as_slice(), &[whole]);
     }
 }

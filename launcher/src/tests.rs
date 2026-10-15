@@ -13,7 +13,13 @@ use std::cell::RefCell;
 use std::path::Path;
 use std::rc::Rc;
 use std::sync::LazyLock;
+use std::sync::{
+    Arc,
+    atomic::{AtomicBool, Ordering},
+};
+use std::task::{Context, Poll, Wake, Waker};
 
+use iced::futures::StreamExt;
 use iced::keyboard::{self, Key, Modifiers, key::Named};
 use iced::theme::Base as _;
 use iced::widget::Id;
@@ -26,11 +32,21 @@ use crate::app::{
     App, COMPUTER_BOX, ComputerForm, Dialog, FILTER, FORM_NAME, FORM_USERNAME, Message, PASSWORD, looks_like_address,
     relative_date, window_size,
 };
-use crate::backend::{Backend, Demo, Ended, Live, Report, Status, Transport};
+use crate::backend::{Backend, CredentialFuture, Credentials, Demo, Ended, Live, Report, Status, Transport};
 use crate::library::{Layout, Library, Preferences, Profile, format_iso, parse_iso};
 use crate::{style, view};
 
 const REFUSED: &str = "The user name or password is incorrect.";
+
+struct ReadyWake(AtomicBool);
+impl Wake for ReadyWake {
+    fn wake(self: Arc<Self>) {
+        self.0.store(true, Ordering::Relaxed);
+    }
+    fn wake_by_ref(self: &Arc<Self>) {
+        self.0.store(true, Ordering::Relaxed);
+    }
+}
 
 /// `App::update` sets its toast timers up with tokio, which the iced runtime provides
 /// around every update in the real window.
@@ -48,6 +64,9 @@ struct BackendErrors {
     delete_profile: Option<String>,
     save_preferences: Option<String>,
     save_password: Option<String>,
+    forget_password: Option<String>,
+    pending_password:
+        Option<iced::futures::channel::oneshot::Receiver<Result<Option<zeroize::Zeroizing<String>>, String>>>,
 }
 
 /// The in-memory backend, shared so a test can read what the app saved, launched and
@@ -90,20 +109,26 @@ impl Backend for Shared {
     fn kill_all(&mut self) {
         self.demo.borrow_mut().kill_all();
     }
-    fn saved_password(&mut self, profile_id: &str) -> Result<Option<zeroize::Zeroizing<String>>, String> {
-        self.demo.borrow_mut().saved_password(profile_id)
+    fn saved_password(&mut self, credentials: &Credentials) -> CredentialFuture<Option<zeroize::Zeroizing<String>>> {
+        if let Some(pending) = self.errors.borrow_mut().pending_password.take() {
+            return Box::pin(async move { pending.await.map_err(|error| error.to_string())? });
+        }
+        self.demo.borrow_mut().saved_password(credentials)
     }
-    fn has_saved_password(&mut self, profile_id: &str) -> Result<bool, String> {
-        self.demo.borrow_mut().has_saved_password(profile_id)
+    fn has_saved_password(&mut self, credentials: &Credentials) -> CredentialFuture<bool> {
+        self.demo.borrow_mut().has_saved_password(credentials)
     }
-    fn save_password(&mut self, profile: &Profile, password: &str) -> Result<(), String> {
+    fn save_password(&mut self, profile: &Profile, password: &str) -> CredentialFuture<()> {
         if let Some(error) = &self.errors.borrow().save_password {
-            return Err(error.clone());
+            return Box::pin(std::future::ready(Err(error.clone())));
         }
         self.demo.borrow_mut().save_password(profile, password)
     }
-    fn forget_password(&mut self, profile_id: &str) -> Result<(), String> {
-        self.demo.borrow_mut().forget_password(profile_id)
+    fn forget_password(&mut self, credentials: &Credentials) -> CredentialFuture<()> {
+        if let Some(error) = &self.errors.borrow().forget_password {
+            return Box::pin(std::future::ready(Err(error.clone())));
+        }
+        self.demo.borrow_mut().forget_password(credentials)
     }
 }
 
@@ -154,8 +179,8 @@ impl Launcher {
         Simulator::with_size(settings, window_size(self.app.layout).1, view::view(&self.app))
     }
     /// Runs one interaction against the current view, then applies the messages it
-    /// produced. The tasks `update` returns (focus moves, timers, window changes) are not
-    /// run, and focus does not survive into the next view: fields are clicked before typing.
+    /// produced. Immediate in-memory keyring replies run; focus moves, timers, window
+    /// changes and host commands do not. Fields are clicked before typing.
     fn act(&mut self, interact: impl FnOnce(&mut Simulator<'_, Message>)) -> Vec<Message> {
         let messages: Vec<Message> = {
             let mut ui = self.ui();
@@ -163,9 +188,59 @@ impl Launcher {
             ui.into_messages().collect()
         };
         for message in &messages {
-            let _ = self.app.update(message.clone());
+            self.update(message.clone());
         }
         messages
+    }
+    fn update(&mut self, message: Message) {
+        let credentials = matches!(
+            message,
+            Message::BoxSubmit
+                | Message::ConnectChosen
+                | Message::Activate(_)
+                | Message::FilterSubmit
+                | Message::RowPressed(_)
+                | Message::Edit(_)
+                | Message::EditChosen
+                | Message::FormSave
+                | Message::FormForgetPassword
+                | Message::PasswordSubmit
+                | Message::ConfirmYes
+                | Message::Tick
+        );
+        let task = self.app.update(message);
+        if credentials {
+            self.finish_credentials(task);
+        }
+    }
+    /// Poll only ready replies; delayed requests remain controllable by their tests.
+    fn finish_credentials(&mut self, task: iced::Task<Message>) {
+        let Some(mut stream) = iced_test::runtime::task::into_stream(task) else {
+            return;
+        };
+        let wake = Arc::new(ReadyWake(AtomicBool::new(false)));
+        let waker = Waker::from(Arc::clone(&wake));
+        let mut context = Context::from_waker(&waker);
+        loop {
+            wake.0.store(false, Ordering::Relaxed);
+            let action = match stream.poll_next_unpin(&mut context) {
+                Poll::Ready(Some(action)) => action,
+                Poll::Pending if wake.0.load(Ordering::Relaxed) => continue,
+                _ => break,
+            };
+            if let iced_test::runtime::Action::Output(message) = action
+                && matches!(
+                    message,
+                    Message::PasswordLoaded { .. }
+                        | Message::PasswordPresence { .. }
+                        | Message::PasswordStored { .. }
+                        | Message::PasswordForgotten { .. }
+                )
+            {
+                let next = self.app.update(message);
+                self.finish_credentials(next);
+            }
+        }
     }
     /// Clicks the topmost widget that reads `text`: a dialog's button rather than the
     /// window's button of the same name beneath it.
@@ -287,7 +362,7 @@ impl Launcher {
     /// What the session processes report at the next poll of the window's timer.
     fn report(&mut self, status: Status) {
         self.demo.borrow_mut().pending = status;
-        let _ = self.app.update(Message::Tick);
+        self.update(Message::Tick);
     }
     /// The computer answered, over UDP v2.
     fn answer(&mut self, session: &str) {
@@ -737,8 +812,8 @@ impl Launcher {
         self.app.sessions.last().expect("a session opened").id.clone()
     }
     fn remembered(&self, name: &str) -> Option<String> {
-        let id = self.saved(name).id;
-        self.demo.borrow().passwords.get(&id).cloned()
+        let credentials = Credentials::from(&self.saved(name));
+        self.demo.borrow().passwords.get(&credentials).cloned()
     }
     /// The user closed the desktop window.
     fn close_cleanly(&mut self, session: &str) {
@@ -752,8 +827,8 @@ impl Launcher {
         });
     }
     fn remember(&self, name: &str, password: &str) {
-        let id = self.saved(name).id;
-        self.demo.borrow_mut().passwords.insert(id, password.into());
+        let credentials = Credentials::from(&self.saved(name));
+        self.demo.borrow_mut().passwords.insert(credentials, password.into());
     }
 }
 
@@ -841,6 +916,122 @@ fn moving_a_computer_to_another_address_or_account_forgets_its_password() {
 }
 
 #[test]
+fn a_failed_forget_never_reuses_the_old_secret_after_retargeting_or_restart() {
+    for (field, value) in [("address", "192.0.2.99"), ("username", "someone-else")] {
+        let mut launcher = Launcher::full();
+        launcher.remember("Office PC", "old-account-secret");
+        let old = Credentials::from(&launcher.saved("Office PC"));
+        launcher.backend_errors.borrow_mut().forget_password = Some("The keyring is locked.".into());
+        launcher.edit_in_full("Office PC");
+        launcher.update(match field {
+            "address" => Message::FormAddress(value.into()),
+            _ => Message::FormUsername(value.into()),
+        });
+        let _ = launcher.click("Save");
+        assert!(launcher.demo.borrow().passwords.contains_key(&old));
+        assert!(
+            launcher
+                .toast()
+                .is_some_and(|text| text.contains("could not be forgotten"))
+        );
+
+        // Reopen with the persisted library and the unchanged keyring contents.
+        let mut demo = Demo::with(launcher.demo.borrow().library.clone());
+        demo.passwords = launcher.demo.borrow().passwords.clone();
+        let mut reopened = Launcher::open(demo, Layout::Full);
+        let _ = reopened.click("Office PC");
+        assert!(
+            reopened.app.sessions.is_empty(),
+            "{field}: old secret must not launch the new account"
+        );
+        assert!(reopened.app.password_dialog().is_some());
+    }
+}
+
+#[test]
+fn a_slow_keyring_lookup_leaves_typing_responsive_and_cannot_replace_the_typed_password() {
+    let mut launcher = Launcher::simple();
+    let id = launcher.saved("Office PC").id;
+    let (reply, pending) = iced::futures::channel::oneshot::channel();
+    launcher.backend_errors.borrow_mut().pending_password = Some(pending);
+    let lookup = launcher.app.update(Message::RowPressed(id));
+    assert!(launcher.app.password_dialog().is_some_and(|form| form.lookup.is_some()));
+    launcher.type_into(PASSWORD, "new-password");
+    reply.send(Ok(Some("old-password".to_owned().into()))).unwrap();
+    launcher.finish_credentials(lookup);
+    assert!(launcher.app.sessions.is_empty());
+    assert_eq!(
+        launcher.app.password_dialog().unwrap().password.as_str(),
+        "new-password"
+    );
+}
+
+#[test]
+fn cancelled_and_reopened_sign_in_ignores_the_previous_keyring_reply() {
+    let mut launcher = Launcher::simple();
+    let id = launcher.saved("Office PC").id;
+    let (reply, pending) = iced::futures::channel::oneshot::channel();
+    launcher.backend_errors.borrow_mut().pending_password = Some(pending);
+    let lookup = launcher.app.update(Message::RowPressed(id.clone()));
+    launcher.update(Message::CloseDialog);
+    launcher.update(Message::RowPressed(id));
+    reply.send(Ok(Some("cancelled-secret".to_owned().into()))).unwrap();
+    launcher.finish_credentials(lookup);
+    assert!(launcher.app.sessions.is_empty());
+    assert!(launcher.app.password_dialog().is_some());
+}
+
+#[test]
+fn a_keyring_reply_cannot_launch_a_changed_or_deleted_profile() {
+    for deleted in [false, true] {
+        let mut launcher = Launcher::simple();
+        let mut profile = launcher.saved("Office PC");
+        let (reply, pending) = iced::futures::channel::oneshot::channel();
+        launcher.backend_errors.borrow_mut().pending_password = Some(pending);
+        let lookup = launcher.app.update(Message::RowPressed(profile.id.clone()));
+        if deleted {
+            launcher.app.library.remove(&profile.id);
+        } else {
+            profile.address = "192.0.2.99".into();
+            launcher.app.library.upsert(profile).unwrap();
+        }
+        reply.send(Ok(Some("original-host-secret".to_owned().into()))).unwrap();
+        launcher.finish_credentials(lookup);
+        assert!(launcher.app.sessions.is_empty());
+        assert!(launcher.demo.borrow().launches.is_empty());
+    }
+}
+
+#[test]
+fn a_refusal_from_a_previous_endpoint_does_not_forget_the_new_endpoints_secret() {
+    let mut launcher = Launcher::simple();
+    let session = launcher.connect_remembering("Office PC", "old-secret");
+    let mut profile = launcher.saved("Office PC");
+    profile.address = "192.0.2.99".into();
+    launcher.app.library.upsert(profile.clone()).unwrap();
+    launcher.demo.borrow_mut().library.upsert(profile.clone()).unwrap();
+    launcher
+        .demo
+        .borrow_mut()
+        .passwords
+        .insert(Credentials::from(&profile), "new-secret".into());
+    launcher.refuse(&session);
+    assert_eq!(launcher.remembered("Office PC").as_deref(), Some("new-secret"));
+    assert!(launcher.app.password_dialog().is_none());
+}
+
+#[test]
+fn keyring_completion_debug_output_redacts_passwords() {
+    let profile = two_computers().library.computers.remove(0);
+    let message = Message::PasswordLoaded {
+        request: 1,
+        credentials: Credentials::from(&profile),
+        result: Ok(Some("dummy-credential-that-must-stay-private".to_owned().into())),
+    };
+    assert!(!format!("{message:?}").contains("dummy-credential-that-must-stay-private"));
+}
+
+#[test]
 fn removing_a_computer_forgets_its_password() {
     let mut launcher = Launcher::full();
     launcher.remember("Office PC", "dummy-test-only");
@@ -848,7 +1039,7 @@ fn removing_a_computer_forgets_its_password() {
     launcher.edit_in_full("Office PC");
     let _ = launcher.click("Remove");
     let _ = launcher.click("Remove");
-    assert!(!launcher.demo.borrow().passwords.contains_key(&id));
+    assert!(!launcher.demo.borrow().passwords.keys().any(|key| key.profile_id == id));
 }
 
 #[test]

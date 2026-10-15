@@ -11,6 +11,16 @@ or desktop size changes force a full copy. The connection bar and close dialog
 contribute damage for both their previous and current locations, which restores
 the desktop when they disappear. Full-frame RPC delivery remains supported.
 
+For fixed-resolution desktops scaled to another window size, the UI copies dirty
+source pixels into a private cache and releases the shared framebuffer before
+filtering. Switching through an unscaled presentation discards that cache so later
+scaled draws cannot reuse stale pixels. Bilinear damage expands in source pixels
+before mapping to the window, including the wider filter footprint when enlarging.
+
+Opening or closing the disconnect dialog invalidates the whole window once. While
+it stays open, only freshly copied damage is dimmed; the panel repaints separately.
+Overlapping copy rectangles are merged so their pixels are not dimmed twice.
+
 ## Local comparison, 2026-09-26
 
 Both executables connected to the same seeded IronRDP example server over TCP on

@@ -3,6 +3,7 @@
 use iced::Task;
 use iced::widget::{Id, operation};
 
+use crate::backend::Credentials;
 use crate::library::{Layout, Profile};
 
 use super::{
@@ -133,6 +134,7 @@ impl App {
     // ---------- computer dialog ----------
     pub(super) fn edit_computer(&mut self, id: Option<&str>, fresh: bool, address: &str) -> Task<Message> {
         let existing = id.and_then(|id| self.profile(id)).cloned();
+        let request = self.credential_request();
         let mut form = ComputerForm {
             editing: existing.as_ref().map(|p| p.id.clone()),
             connect_after: fresh,
@@ -149,11 +151,10 @@ impl App {
             options: ConnectionOptions::default(),
             favourite: false,
             saved_password: false,
+            keyring_request: request,
             error: None,
         };
         if let Some(p) = &existing {
-            // A keyring that cannot be reached just hides the Forget button.
-            form.saved_password = self.backend.has_saved_password(&p.id).unwrap_or(false);
             // Older quick connections stored the address as their generated display name.
             form.name = if fresh && p.name == p.address {
                 String::new()
@@ -169,7 +170,20 @@ impl App {
         }
         self.combo_open = false;
         self.dialogs.push(Dialog::Computer(form));
-        operation::focus(Id::new(if fresh { FORM_USERNAME } else { FORM_NAME }))
+        let lookup = existing.map_or_else(Task::none, |profile| {
+            let credentials = Credentials::from(&profile);
+            Task::perform(self.backend.has_saved_password(&credentials), move |result| {
+                Message::PasswordPresence {
+                    request,
+                    credentials,
+                    result,
+                }
+            })
+        });
+        Task::batch([
+            operation::focus(Id::new(if fresh { FORM_USERNAME } else { FORM_NAME })),
+            lookup,
+        ])
     }
     pub(super) fn save_computer(&mut self) -> Task<Message> {
         let Some(Dialog::Computer(form)) = self.dialogs.last() else {
@@ -181,7 +195,7 @@ impl App {
         let moved = previous
             .as_ref()
             .filter(|p| p.address != address || p.username != form.username.trim())
-            .map(|p| p.id.clone());
+            .map(Credentials::from);
         let mut profile = previous.unwrap_or_else(Profile::draft);
         profile.name = match form.name.trim() {
             "" => address.chars().take(100).collect(),
@@ -196,9 +210,7 @@ impl App {
             Ok((library, saved)) => {
                 self.library = library;
                 self.dialogs.pop();
-                if let Some(id) = moved {
-                    let _ = self.backend.forget_password(&id);
-                }
+                let forget = moved.map_or_else(Task::none, |key| self.forget_credentials(key, None));
                 // Editing the selected computer also refreshes its simple-layout options.
                 // Leave another computer's unsaved selection and options alone.
                 if self.layout == Layout::Simple || self.chosen.as_deref() == Some(saved.as_str()) {
@@ -206,9 +218,9 @@ impl App {
                 }
                 self.resync();
                 if connect_after {
-                    return self.prompt_password(&saved, None, false);
+                    return Task::batch([forget, self.prompt_password(&saved, None, false)]);
                 }
-                Task::none()
+                forget
             }
             Err(e) => {
                 if let Some(Dialog::Computer(form)) = self.dialogs.last_mut() {
@@ -223,7 +235,56 @@ impl App {
         let Some(Dialog::Computer(ComputerForm { editing: Some(id), .. })) = self.dialogs.last() else {
             return Task::none();
         };
-        match self.backend.forget_password(&id.clone()) {
+        let Some(credentials) = self.profile(id).map(Credentials::from) else {
+            return Task::none();
+        };
+        let request = self.credential_request();
+        self.with_form(|form| form.keyring_request = request);
+        self.forget_credentials(credentials, Some(request))
+    }
+
+    pub(super) fn forget_credentials(&mut self, credentials: Credentials, request: Option<u64>) -> Task<Message> {
+        Task::perform(self.backend.forget_password(&credentials), move |result| {
+            Message::PasswordForgotten {
+                request,
+                credentials,
+                result,
+            }
+        })
+    }
+
+    pub(super) fn password_presence(&mut self, request: u64, credentials: &Credentials, result: Result<bool, String>) {
+        if !self.current_credentials(credentials) {
+            return;
+        }
+        if let Some(Dialog::Computer(form)) = self.dialogs.last_mut()
+            && form.keyring_request == request
+            && form.editing.as_deref() == Some(credentials.profile_id.as_str())
+        {
+            // An unavailable keyring leaves the dialog usable, without a Forget button.
+            form.saved_password = result.unwrap_or(false);
+        }
+    }
+
+    pub(super) fn password_forgotten(
+        &mut self,
+        request: Option<u64>,
+        credentials: &Credentials,
+        result: Result<(), String>,
+    ) -> Task<Message> {
+        let Some(request) = request else {
+            return match result {
+                Ok(()) => Task::none(),
+                Err(error) => self.notify(format!("The remembered password could not be forgotten. {error}")),
+            };
+        };
+        if !self.current_credentials(credentials)
+            || !matches!(self.dialogs.last(), Some(Dialog::Computer(form))
+                if form.keyring_request == request && form.editing.as_deref() == Some(credentials.profile_id.as_str()))
+        {
+            return Task::none();
+        }
+        match result {
             Ok(()) => {
                 self.with_form(|form| form.saved_password = false);
                 self.notify("The remembered password was forgotten.")

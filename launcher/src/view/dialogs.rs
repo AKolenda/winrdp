@@ -88,6 +88,13 @@ pub(super) fn password<'a>(t: Tokens, form: &'a PasswordForm) -> Element<'a> {
             bottom: 18.0,
             left: 22.0,
         });
+    if form.lookup.is_some() {
+        body = body.push(label(
+            "Checking the keyring. You can also enter a password.",
+            12.0,
+            t.mute,
+        ));
+    }
     if let Some(error) = &form.error {
         body = body.push(label(error.as_str(), 12.0, t.danger));
     }

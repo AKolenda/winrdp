@@ -3,7 +3,9 @@
 //! `winrdp-session` processes. [`Demo`] keeps both in memory for tests and screenshots.
 use std::collections::HashMap;
 use std::fs;
+use std::future::Future;
 use std::path::{Path, PathBuf};
+use std::pin::Pin;
 use std::process::{Child, Command, Stdio};
 use std::time::Duration;
 
@@ -52,6 +54,26 @@ pub struct Status {
     pub live: Vec<Live>,
 }
 
+/// A remembered secret belongs to this account and endpoint, not just an editable row.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct Credentials {
+    pub profile_id: String,
+    pub address: String,
+    pub username: String,
+}
+impl From<&Profile> for Credentials {
+    fn from(profile: &Profile) -> Self {
+        Self {
+            profile_id: profile.id.clone(),
+            address: profile.address.clone(),
+            username: profile.username.clone(),
+        }
+    }
+}
+
+/// Owned requests can wait on the desktop keyring without borrowing the UI or blocking it.
+pub type CredentialFuture<T> = Pin<Box<dyn Future<Output = Result<T, String>> + Send>>;
+
 pub trait Backend {
     fn load(&mut self) -> Result<Library, String>;
     /// Saves a computer and returns the new library with the identifier it was saved under.
@@ -64,12 +86,12 @@ pub trait Backend {
     fn kill(&mut self, session: &str);
     fn kill_all(&mut self);
     /// The password the user asked to remember for a computer, if any.
-    fn saved_password(&mut self, profile_id: &str) -> Result<Option<Zeroizing<String>>, String>;
+    fn saved_password(&mut self, credentials: &Credentials) -> CredentialFuture<Option<Zeroizing<String>>>;
     /// Whether a password is remembered for a computer, without reading it.
-    fn has_saved_password(&mut self, profile_id: &str) -> Result<bool, String>;
-    fn save_password(&mut self, profile: &Profile, password: &str) -> Result<(), String>;
+    fn has_saved_password(&mut self, credentials: &Credentials) -> CredentialFuture<bool>;
+    fn save_password(&mut self, profile: &Profile, password: &str) -> CredentialFuture<()>;
     /// Forgets a computer's password; nothing to forget is not an error.
-    fn forget_password(&mut self, profile_id: &str) -> Result<(), String>;
+    fn forget_password(&mut self, credentials: &Credentials) -> CredentialFuture<()>;
 }
 
 /// `$XDG_CONFIG_HOME/io.winrdp.Next` and `$XDG_DATA_HOME/io.winrdp.Next/logs`: where the
@@ -198,21 +220,25 @@ impl Backend for Real {
             self.kill(&id);
         }
     }
-    fn saved_password(&mut self, profile_id: &str) -> Result<Option<Zeroizing<String>>, String> {
-        crate::keyring::get(profile_id)
+    fn saved_password(&mut self, credentials: &Credentials) -> CredentialFuture<Option<Zeroizing<String>>> {
+        Box::pin(crate::keyring::get(credentials.clone()))
     }
-    fn has_saved_password(&mut self, profile_id: &str) -> Result<bool, String> {
-        crate::keyring::has(profile_id)
+    fn has_saved_password(&mut self, credentials: &Credentials) -> CredentialFuture<bool> {
+        Box::pin(crate::keyring::has(credentials.clone()))
     }
-    fn save_password(&mut self, profile: &Profile, password: &str) -> Result<(), String> {
+    fn save_password(&mut self, profile: &Profile, password: &str) -> CredentialFuture<()> {
         let label = format!(
             "Win RDP: {} ({} at {})",
             profile.name, profile.username, profile.address
         );
-        crate::keyring::set(&profile.id, &label, password)
+        Box::pin(crate::keyring::set(
+            Credentials::from(profile),
+            label,
+            Zeroizing::new(password.to_owned()),
+        ))
     }
-    fn forget_password(&mut self, profile_id: &str) -> Result<(), String> {
-        crate::keyring::delete(profile_id)
+    fn forget_password(&mut self, credentials: &Credentials) -> CredentialFuture<()> {
+        Box::pin(crate::keyring::delete(credentials.clone()))
     }
 }
 
@@ -344,7 +370,7 @@ pub struct Demo {
     pub pending: Status,
     pub live: HashMap<String, Option<Transport>>,
     /// Remembered passwords by computer identifier, standing in for the keyring.
-    pub passwords: HashMap<String, String>,
+    pub passwords: HashMap<Credentials, String>,
     next: u32,
 }
 #[cfg_attr(not(test), allow(dead_code))]
@@ -439,19 +465,20 @@ impl Backend for Demo {
     fn kill_all(&mut self) {
         self.killed.extend(self.live.drain().map(|(session, _)| session));
     }
-    fn saved_password(&mut self, profile_id: &str) -> Result<Option<Zeroizing<String>>, String> {
-        Ok(self.passwords.get(profile_id).map(|p| Zeroizing::new(p.clone())))
+    fn saved_password(&mut self, credentials: &Credentials) -> CredentialFuture<Option<Zeroizing<String>>> {
+        let password = self.passwords.get(credentials).map(|p| Zeroizing::new(p.clone()));
+        Box::pin(std::future::ready(Ok(password)))
     }
-    fn has_saved_password(&mut self, profile_id: &str) -> Result<bool, String> {
-        Ok(self.passwords.contains_key(profile_id))
+    fn has_saved_password(&mut self, credentials: &Credentials) -> CredentialFuture<bool> {
+        Box::pin(std::future::ready(Ok(self.passwords.contains_key(credentials))))
     }
-    fn save_password(&mut self, profile: &Profile, password: &str) -> Result<(), String> {
-        self.passwords.insert(profile.id.clone(), password.to_owned());
-        Ok(())
+    fn save_password(&mut self, profile: &Profile, password: &str) -> CredentialFuture<()> {
+        self.passwords.insert(Credentials::from(profile), password.to_owned());
+        Box::pin(std::future::ready(Ok(())))
     }
-    fn forget_password(&mut self, profile_id: &str) -> Result<(), String> {
-        self.passwords.remove(profile_id);
-        Ok(())
+    fn forget_password(&mut self, credentials: &Credentials) -> CredentialFuture<()> {
+        self.passwords.remove(credentials);
+        Box::pin(std::future::ready(Ok(())))
     }
 }
 

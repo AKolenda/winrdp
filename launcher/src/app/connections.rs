@@ -3,7 +3,7 @@
 use iced::Task;
 use iced::widget::{Id, operation};
 
-use crate::backend::Ended;
+use crate::backend::{Credentials, Ended};
 use crate::library::{Profile, now_iso};
 
 use super::{
@@ -52,15 +52,6 @@ impl App {
         if p.username.is_empty() {
             return self.edit_computer(Some(id), true, "");
         }
-        if refused.is_none() && self.password_dialog().is_none() {
-            // A keyring that cannot be reached means asking, as if nothing was remembered.
-            if let Ok(Some(password)) = self.backend.saved_password(id) {
-                return match self.start_session(&p, &password, p.fullscreen) {
-                    Ok(()) => Task::none(),
-                    Err(e) => self.notify(e),
-                };
-            }
-        }
         // A refusal can land while the user is already typing into a dialog for another
         // computer. Re-pointing that dialog would send the password they are typing to
         // a different host, so report the refusal and leave the open dialog alone.
@@ -70,9 +61,23 @@ impl App {
                 None => Task::none(),
             };
         }
+        let credentials = Credentials::from(&p);
+        let lookup = refused.is_none().then(|| self.credential_request());
+        let task = lookup.map_or_else(Task::none, |request| {
+            let credentials = credentials.clone();
+            Task::perform(self.backend.saved_password(&credentials), move |result| {
+                Message::PasswordLoaded {
+                    request,
+                    credentials,
+                    result: result.map(|password| password.map(Secret::from)),
+                }
+            })
+        });
         self.combo_open = false;
         self.dialogs.push(Dialog::Password(PasswordForm {
             profile: p.id.clone(),
+            credentials,
+            lookup,
             title: format!("Connect to {}", p.name),
             account: format!("{} at {}", p.username, p.address),
             error: refused,
@@ -80,7 +85,36 @@ impl App {
             fullscreen: p.fullscreen,
             remember,
         }));
-        operation::focus(Id::new(PASSWORD))
+        Task::batch([operation::focus(Id::new(PASSWORD)), task])
+    }
+
+    pub(super) fn password_loaded(
+        &mut self,
+        request: u64,
+        credentials: &Credentials,
+        result: Result<Option<Secret>, String>,
+    ) -> Task<Message> {
+        let Some(index) = self.dialogs.iter().position(|dialog| {
+            matches!(dialog, Dialog::Password(form) if form.lookup == Some(request) && form.credentials == *credentials)
+        }) else { return Task::none() };
+        if let Dialog::Password(form) = &mut self.dialogs[index] {
+            form.lookup = None;
+        }
+        // Cancellation, typing and an intervening edit must never send a late secret.
+        if self.quitting || index + 1 != self.dialogs.len() || !self.current_credentials(credentials) {
+            return Task::none();
+        }
+        let Ok(Some(password)) = result else {
+            return Task::none();
+        };
+        let Some(profile) = self.profile(&credentials.profile_id).cloned() else {
+            return Task::none();
+        };
+        self.dialogs.remove(index);
+        match self.start_session(&profile, password.as_str(), profile.fullscreen, true) {
+            Ok(()) => Task::none(),
+            Err(error) => self.notify(error),
+        }
     }
     pub(super) fn submit_password(&mut self) -> Task<Message> {
         let Some(index) = self.dialogs.iter().rposition(|d| matches!(d, Dialog::Password(_))) else {
@@ -92,20 +126,33 @@ impl App {
         let Some(p) = self.profile(&form.profile).cloned() else {
             return Task::none();
         };
-        if let Err(e) = self.start_session(&p, form.password.as_str(), form.fullscreen) {
+        if Credentials::from(&p) != form.credentials {
+            return self.notify("The computer changed. Connect again to confirm its address and account.");
+        }
+        if let Err(e) = self.start_session(&p, form.password.as_str(), form.fullscreen, form.remember) {
             return self.notify(e);
         }
         if !form.remember {
             return Task::none();
         }
         // Remembered as the connection starts; a refusal forgets it again (`report_end`).
-        match self.backend.save_password(&p, form.password.as_str()) {
-            Ok(()) => Task::none(),
-            Err(e) => self.notify(format!("The password was not remembered. {e}")),
-        }
+        Task::perform(self.backend.save_password(&p, form.password.as_str()), move |result| {
+            Message::PasswordStored {
+                credentials: form.credentials,
+                result,
+            }
+        })
         // `form.password` is zeroized as it drops here.
     }
-    fn start_session(&mut self, p: &Profile, password: &str, fullscreen: bool) -> Result<(), String> {
+    pub(super) fn password_stored(&mut self, credentials: Credentials, result: Result<(), String>) -> Task<Message> {
+        match result {
+            Ok(()) if !self.current_credentials(&credentials) => self.forget_credentials(credentials, None),
+            Ok(()) => Task::none(),
+            Err(error) => self.notify(format!("The password was not remembered. {error}")),
+        }
+    }
+
+    fn start_session(&mut self, p: &Profile, password: &str, fullscreen: bool, remembered: bool) -> Result<(), String> {
         let session = self.backend.launch(p, password, fullscreen)?;
         self.sessions.push(Session {
             id: session,
@@ -114,6 +161,8 @@ impl App {
             state: SessionState::Connecting,
             transport: None,
             stamped: false,
+            credentials: Credentials::from(p),
+            remembered,
         });
         Ok(())
     }
@@ -168,14 +217,15 @@ impl App {
         let toast = self.notify(format!("{name}: {}{detail}", failure.message));
         match session {
             Some(s) if retry => {
-                // A refused remembered password is forgotten, so the next connection asks.
-                let remembered = self.backend.has_saved_password(&s.profile_id).unwrap_or(false);
-                if remembered {
-                    let _ = self.backend.forget_password(&s.profile_id);
+                // A failure from an older endpoint cannot clear or prompt for a newly edited one.
+                let forget = self.forget_credentials(s.credentials.clone(), None);
+                if !self.current_credentials(&s.credentials) {
+                    return Task::batch([toast, forget]);
                 }
                 Task::batch([
                     toast,
-                    self.prompt_password(&s.profile_id, Some(failure.message.clone()), remembered),
+                    forget,
+                    self.prompt_password(&s.profile_id, Some(failure.message.clone()), s.remembered),
                 ])
             }
             _ => toast,
