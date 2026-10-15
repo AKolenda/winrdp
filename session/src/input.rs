@@ -35,6 +35,7 @@ impl InputQueue {
     // More than the 512 scan codes and five buttons that release_all may queue.
     const LIMIT: usize = 1024;
     const RETRY: Duration = Duration::from_millis(10);
+    const BATCH: usize = 64;
 
     pub fn deadline(&self) -> Option<Instant> {
         self.retry_at
@@ -83,29 +84,32 @@ impl InputQueue {
     }
 
     pub fn release_buttons(&mut self, target: &InputTarget) {
+        // Unsent presses and motion are dropped. Queued releases keep their place, so a
+        // repeated capture cannot move one behind keys pressed after it.
         self.pending.retain(|operation| {
             !matches!(
                 operation,
-                Operation::MouseMove(_)
-                    | Operation::MouseButtonPressed(_)
-                    | Operation::MouseButtonReleased(_)
-                    | Operation::WheelRotations(_)
+                Operation::MouseMove(_) | Operation::MouseButtonPressed(_) | Operation::WheelRotations(_)
             )
         });
+        let queued = |button: MouseButton| {
+            self.pending
+                .iter()
+                .any(|operation| matches!(operation, Operation::MouseButtonReleased(other) if *other == button))
+        };
         let releases = self
             .database
             .mouse_buttons_state()
             .iter_ones()
             .filter_map(MouseButton::from_idx)
+            .filter(|button| !queued(*button))
             .map(Operation::MouseButtonReleased)
             .collect::<Vec<_>>();
-        // Button releases precede any queued keys and do not grow the bounded queue.
+        // Other button releases follow queued keys, so Windows sees them in the order they happened.
         if self.pending.len() + releases.len() > Self::LIMIT {
             self.queue_releases();
         } else {
-            for release in releases.into_iter().rev() {
-                self.pending.push_front(release);
-            }
+            self.pending.extend(releases);
         }
         self.flush(target);
     }
@@ -127,10 +131,14 @@ impl InputQueue {
                             return;
                         }
                     };
-                    let events = self.database.apply([operation.clone()]);
+                    // One message carries a bounded batch, well under the 255 events
+                    // a fast-path input PDU can hold.
+                    let batch = self.pending.len().min(Self::BATCH);
+                    let events = self.database.apply(self.pending.drain(..batch));
                     if !events.is_empty() {
                         permit.send(RdpInputEvent::FastPath(events));
                     }
+                    continue;
                 }
                 InputTarget::Rpc(daemon) => {
                     if !daemon.input_operations([operation.clone()]).is_ok() {
@@ -191,10 +199,59 @@ mod tests {
         ));
         let _ = receiver.try_recv().expect("an accepted input event is queued");
         input.flush(&target);
+        assert!(!input.database.mouse_buttons_state().any());
+        let event = receiver.try_recv().expect("an accepted input event is queued");
+        assert!(
+            matches!(event, RdpInputEvent::FastPath(ref events) if events.len() == 2),
+            "the motion and release travel together"
+        );
+    }
+
+    #[test]
+    fn released_buttons_follow_queued_key_releases() {
+        let (sender, mut receiver) = RdpInputSender::channel(1);
+        let target = InputTarget::Direct(sender);
+        let mut input = InputQueue::default();
+        let key = Scancode::from_u8(false, 0x1D);
+        input.send(
+            &target,
+            [
+                Operation::KeyPressed(key),
+                Operation::MouseButtonPressed(MouseButton::Left),
+            ],
+        );
+        input.send(&target, [Operation::KeyReleased(key)]);
+        input.release_buttons(&target);
+        assert!(matches!(input.pending[0], Operation::KeyReleased(_)));
+        assert!(matches!(
+            input.pending[1],
+            Operation::MouseButtonReleased(MouseButton::Left)
+        ));
+        let _ = receiver.try_recv().expect("an accepted input event is queued");
+        input.flush(&target);
+        assert!(!input.database.keyboard_state().any());
+        assert!(!input.database.mouse_buttons_state().any());
+    }
+
+    #[test]
+    fn a_repeated_capture_keeps_a_queued_release_ahead_of_later_keys() {
+        let (sender, mut receiver) = RdpInputSender::channel(1);
+        let target = InputTarget::Direct(sender);
+        let mut input = InputQueue::default();
+        let key = Scancode::from_u8(false, 0x1D);
+        input.send(&target, [Operation::MouseButtonPressed(MouseButton::Left)]);
+        input.release_buttons(&target);
+        input.send(&target, [Operation::KeyPressed(key)]);
+        input.release_buttons(&target);
+        assert_eq!(input.pending.len(), 2);
+        assert!(matches!(
+            input.pending[0],
+            Operation::MouseButtonReleased(MouseButton::Left)
+        ));
+        assert!(matches!(input.pending[1], Operation::KeyPressed(_)));
         let _ = receiver.try_recv().expect("an accepted input event is queued");
         input.flush(&target);
         assert!(!input.database.mouse_buttons_state().any());
-        assert!(receiver.try_recv().is_ok());
     }
 
     #[test]

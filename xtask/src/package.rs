@@ -21,7 +21,7 @@ use crate::util::{self, TempDir};
 
 /// The version the package is built as; check-release keeps it equal to the
 /// crates' versions and the AppStream release.
-pub const VERSION: &str = "0.8.2";
+pub const VERSION: &str = "0.8.3";
 
 const MAINTAINER: &str = "Win RDP project <build@localhost>";
 

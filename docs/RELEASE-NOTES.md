@@ -1,3 +1,27 @@
+# Win RDP 0.8.3
+
+- A remembered password belongs to the computer's address and account as well as the
+  computer. Changing either asks for the password again instead of sending the old one
+  elsewhere. Passwords remembered by earlier releases need one fresh sign-in and can still
+  be forgotten.
+- Keyring requests run one at a time in the background, so a slow or locked keyring no
+  longer freezes the launcher, and a sign-in dialog closed early ignores the late reply.
+- Desktop sharing passes its password to `grdctl` on standard input instead of the command
+  line. Older `grdctl` versions refuse instead, and GNOME Settings sets the credentials.
+  Sharing names and passwords need at least two characters, because `grdctl` reports
+  shorter ones as empty.
+- The launcher stops polling when no sessions are open.
+- A fixed resolution scales the desktop outside the shared framebuffer lock, and repaints
+  every pixel that filtering touches. Dimming behind a dialog repaints only changed areas.
+- Keyboard and mouse input waits for a busy connection instead of being dropped, with
+  pointer motion merged. Held keys and buttons are released when the session window loses
+  focus or a dialog takes input, in the order they happened. A drag past the desktop edge
+  continues until the button is released.
+
+This release was checked with the build, lint, test and notice checks. The keyring code was
+tested against an isolated GNOME Keyring. It has not been tested against a Windows PC or on
+native Wayland.
+
 # Win RDP 0.8.2
 
 - The IronRDP fork is rebased onto current upstream IronRDP. Fixes this project

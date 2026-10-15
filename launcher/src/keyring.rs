@@ -29,7 +29,9 @@ fn worker() -> Result<&'static mpsc::SyncSender<Request>, String> {
                         .build()
                         .map_err(|error| error.to_string());
                     for request in receiver {
-                        request(&runtime);
+                        // A panicking request drops its reply, which fails only that request;
+                        // the worker keeps serving later saves and forgets.
+                        let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| request(&runtime)));
                     }
                 })
                 .map(|_| sender)
@@ -197,6 +199,18 @@ mod tests {
                 .unwrap();
         });
         assert_eq!(*events.lock().unwrap(), ["save", "forget"]);
+    }
+
+    #[test]
+    fn a_panicking_request_does_not_stop_the_worker() {
+        let _serial = WORKER_TEST.lock().unwrap();
+        fn request() -> super::KeyringResult<()> {
+            panic!("a keyring request panicked")
+        }
+        let failed = super::run(async { request() });
+        assert!(iced::futures::executor::block_on(failed).is_err());
+        let answered = iced::futures::executor::block_on(super::run(async { Ok(7) }));
+        assert_eq!(answered, Ok(7));
     }
 
     #[test]
