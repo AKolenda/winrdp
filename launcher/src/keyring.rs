@@ -12,6 +12,7 @@ use crate::backend::Credentials;
 const TIMEOUT: Duration = Duration::from_secs(60);
 const MAX_PENDING_REQUESTS: usize = 32;
 type Request = Box<dyn FnOnce(&Result<tokio::runtime::Runtime, String>) + Send>;
+type KeyringResult<T> = Result<T, Box<oo7::Error>>;
 static REQUESTS: OnceLock<Result<mpsc::SyncSender<Request>, String>> = OnceLock::new();
 
 /// Submission order is fixed before any returned future is polled. A late save cannot
@@ -49,7 +50,7 @@ fn attributes(credentials: &Credentials) -> [(&'static str, &str); 4] {
 
 /// Old releases did not bind items to an endpoint. Keep them discoverable for Forget,
 /// but never read their secret or remove another endpoint's newer bound item.
-async fn legacy_items(keyring: &oo7::Keyring, credentials: &Credentials) -> oo7::Result<Vec<oo7::Item>> {
+async fn legacy_items(keyring: &oo7::Keyring, credentials: &Credentials) -> KeyringResult<Vec<oo7::Item>> {
     let mut legacy = Vec::new();
     for item in keyring
         .search_items(&[
@@ -66,7 +67,7 @@ async fn legacy_items(keyring: &oo7::Keyring, credentials: &Credentials) -> oo7:
     Ok(legacy)
 }
 
-async fn clear_legacy(keyring: &oo7::Keyring, credentials: &Credentials) -> oo7::Result<()> {
+async fn clear_legacy(keyring: &oo7::Keyring, credentials: &Credentials) -> KeyringResult<()> {
     for item in legacy_items(keyring, credentials).await? {
         item.delete().await?;
     }
@@ -75,7 +76,7 @@ async fn clear_legacy(keyring: &oo7::Keyring, credentials: &Credentials) -> oo7:
 
 /// Enqueue without waiting; the iced runtime awaits only this request's reply.
 fn run<T: Send + 'static>(
-    request: impl Future<Output = oo7::Result<T>> + Send + 'static,
+    request: impl Future<Output = KeyringResult<T>> + Send + 'static,
 ) -> impl Future<Output = Result<T, String>> + Send {
     let (reply, received) = tokio::sync::oneshot::channel();
     let submitted = worker().and_then(|sender| {
@@ -147,7 +148,8 @@ pub fn set(
         clear_legacy(&keyring, &credentials).await?;
         keyring
             .create_item(&label, &attributes(&credentials), secret, true)
-            .await
+            .await?;
+        Ok(())
     })
 }
 
