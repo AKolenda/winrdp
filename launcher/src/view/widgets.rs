@@ -47,13 +47,6 @@ pub(super) fn hrule<'a>(t: Tokens) -> Element<'a> {
         .style(style::rule(t))
         .into()
 }
-pub(super) fn vrule<'a>(t: Tokens) -> Element<'a> {
-    container(Space::new())
-        .width(1)
-        .height(Fill)
-        .style(style::rule(t))
-        .into()
-}
 pub(super) fn pill<'a>(t: Tokens, content: String, udp: bool) -> Element<'a> {
     let (bg, ink) = if udp {
         (t.accent, t.accent_ink)

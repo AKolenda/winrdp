@@ -9,7 +9,7 @@ mod host_tests;
 mod model;
 
 pub use model::{
-    ComputerForm, Confirm, ConnectionOption, ConnectionOptions, Dialog, Message, Page, PasswordForm, Session,
+    ComputerForm, Confirm, ConnectionOption, ConnectionOptions, Details, Dialog, Message, Page, PasswordForm, Session,
     SessionState,
 };
 use model::{Confirmed, HostPanel, Secret, Toast};
@@ -39,6 +39,8 @@ pub struct App {
     pub user: String,
     pub layout: Layout,
     pub page: Page,
+    /// The Settings explanations unfolded right now.
+    pub details: Vec<Details>,
     // simple layout
     pub computer_box: String,
     pub chosen: Option<String>,
@@ -106,6 +108,7 @@ impl App {
             user: std::env::var("USER").unwrap_or_default(),
             layout,
             page: Page::Computers,
+            details: Vec::new(),
             computer_box: String::new(),
             chosen: None,
             combo_open: false,
@@ -209,6 +212,10 @@ impl App {
     pub fn apply_layout(&mut self, layout: Layout) -> Task<Message> {
         self.layout = layout;
         self.combo_open = false;
+        // The simple window has no Settings page; it opens on the computers next time.
+        if layout == Layout::Simple && self.page == Page::Settings {
+            self.page = Page::Computers;
+        }
         self.resync();
         let Some(old) = self.window else { return Task::none() };
         let (_, opened) = window::open(window_settings(layout));
@@ -501,11 +508,21 @@ impl App {
                 Task::none()
             }
             Message::OpenSettings => {
-                if !self.dialogs.iter().any(|d| matches!(d, Dialog::Settings)) {
+                if self.layout == Layout::Full {
+                    self.page = Page::Settings;
+                } else if !self.dialogs.iter().any(|d| matches!(d, Dialog::Settings)) {
                     self.dialogs.push(Dialog::Settings);
                 }
                 self.combo_open = false;
                 self.refresh_host()
+            }
+            Message::ToggleDetails(details) => {
+                if let Some(i) = self.details.iter().position(|d| *d == details) {
+                    self.details.remove(i);
+                } else {
+                    self.details.push(details);
+                }
+                Task::none()
             }
             Message::SetLayout(layout) => match self.save_preferences(|p| p.layout = layout) {
                 Ok(()) => self.apply_layout(layout),

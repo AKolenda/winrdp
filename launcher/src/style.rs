@@ -8,7 +8,11 @@ use iced::{Background, Border, Color, Font, Shadow, Theme, border, color, font};
 
 #[derive(Clone, Copy, Debug)]
 pub struct Tokens {
+    /// The window behind everything: title bar and navigation.
     pub base: Color,
+    /// The content pane raised over the base, with a rounded top-left corner.
+    pub layer: Color,
+    /// Cards, rows and dialogs on the layer.
     pub panel: Color,
     pub ink: Color,
     pub mute: Color,
@@ -24,37 +28,43 @@ pub struct Tokens {
     pub dark: bool,
 }
 pub const LIGHT: Tokens = Tokens {
-    base: color!(0xF3F4F6),
+    base: color!(0xF3F3F3),
+    layer: color!(0xF9F9F9),
     panel: color!(0xFFFFFF),
-    ink: color!(0x1A1D21),
-    mute: color!(0x5E6470),
-    line: color!(0xE1E5EB),
-    hover: color!(0xEBEEF3),
-    selected: color!(0xE3ECF7),
-    accent: color!(0x1E5FD8),
+    ink: color!(0x1A1A1A),
+    mute: color!(0x5F5F5F),
+    line: color!(0xE5E5E5),
+    hover: color!(0xF0F0F0),
+    selected: color!(0xEAEAEA),
+    accent: color!(0x005FB8),
     accent_ink: color!(0xFFFFFF),
-    live: color!(0x1E9E5A),
+    live: color!(0x0F7B0F),
     danger: color!(0xC42B1C),
     field: color!(0xFFFFFF),
-    field_line: color!(0x8B929D),
+    field_line: color!(0xD1D1D1),
     dark: false,
 };
 pub const DARK: Tokens = Tokens {
-    base: color!(0x202124),
-    panel: color!(0x2A2C30),
-    ink: color!(0xF1F2F4),
-    mute: color!(0xA6ACB8),
-    line: color!(0x3C4047),
-    hover: color!(0x34373D),
-    selected: color!(0x2A3D57),
-    accent: color!(0x6FB1FF),
-    accent_ink: color!(0x0A1F3A),
-    live: color!(0x4CCB86),
-    danger: color!(0xFF8A80),
-    field: color!(0x303338),
-    field_line: color!(0x6B7280),
+    base: color!(0x202020),
+    layer: color!(0x272727),
+    panel: color!(0x2D2D2D),
+    ink: color!(0xFFFFFF),
+    mute: color!(0xC5C5C5),
+    line: color!(0x1D1D1D),
+    hover: color!(0x353535),
+    selected: color!(0x333333),
+    accent: color!(0x60CDFF),
+    accent_ink: color!(0x000000),
+    live: color!(0x6CCB5F),
+    danger: color!(0xFF99A4),
+    field: color!(0x2B2B2B),
+    field_line: color!(0x454545),
     dark: true,
 };
+/// Control corners (buttons, fields, navigation items).
+pub const CONTROL: f32 = 4.0;
+/// Surface corners (cards, dialogs, the content pane).
+pub const SURFACE: f32 = 8.0;
 impl Tokens {
     pub fn theme(self) -> Theme {
         Theme::custom(
@@ -109,6 +119,8 @@ pub fn bold() -> Font {
 }
 
 // ---------- icons ----------
+const STAR: &str =
+    r#"<path d="m8 1.9 1.85 3.85 4.2.55-3.07 2.92.78 4.17L8 11.37l-3.76 2.02.78-4.17L1.95 6.3l4.2-.55z"/>"#;
 fn stroke_icon(view_box: u32, body: &str) -> svg::Handle {
     svg::Handle::from_memory(format!(
         r##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {view_box} {view_box}" fill="none" stroke="#000" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round">{body}</svg>"##
@@ -129,6 +141,18 @@ pub struct Icons {
     pub monitor: svg::Handle,
     pub more: svg::Handle,
     pub add_computer: svg::Handle,
+    pub star: svg::Handle,
+    pub star_filled: svg::Handle,
+    pub play: svg::Handle,
+    pub pencil: svg::Handle,
+    pub external: svg::Handle,
+    pub refresh: svg::Handle,
+    pub palette: svg::Handle,
+    pub layout: svg::Handle,
+    pub share: svg::Handle,
+    pub network: svg::Handle,
+    pub info: svg::Handle,
+    pub plus: svg::Handle,
 }
 pub static ICONS: LazyLock<Icons> = LazyLock::new(|| {
     Icons {
@@ -147,6 +171,20 @@ pub static ICONS: LazyLock<Icons> = LazyLock::new(|| {
     monitor: stroke_icon(16, r#"<rect x="1.6" y="2.6" width="12.8" height="9" rx="1.4"/><path d="M6 13.7h4"/>"#),
     more: svg::Handle::from_memory(br##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="#000"><circle cx="3" cy="8" r="1.1"/><circle cx="8" cy="8" r="1.1"/><circle cx="13" cy="8" r="1.1"/></svg>"##.as_slice()),
     add_computer: stroke_icon(48, r#"<rect x="7" y="9" width="34" height="24" rx="3"/><path d="M24 33v6m-9 0h18m-9-24v12m-6-6h12"/>"#),
+    star: stroke_icon(16, STAR),
+    star_filled: svg::Handle::from_memory(format!(
+        r##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="#000" stroke="#000" stroke-width="1.45" stroke-linejoin="round">{STAR}</svg>"##
+    ).into_bytes()),
+    play: stroke_icon(16, r#"<rect x="1.6" y="2.6" width="12.8" height="10.8" rx="1.4"/><path d="M1.6 5.4h12.8"/>"#),
+    pencil: stroke_icon(16, r#"<path d="M10.8 2.6 13.4 5.2 5.6 13H3v-2.6z"/><path d="m9.4 4 2.6 2.6"/>"#),
+    external: stroke_icon(16, r#"<path d="M9.5 2.5h4v4M13.5 2.5 7.5 8.5M12 9.5v3a1 1 0 0 1-1 1H3.5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h3"/>"#),
+    refresh: stroke_icon(16, r#"<path d="M13 8a5 5 0 1 1-1.5-3.6M13 2.5v3h-3"/>"#),
+    palette: stroke_icon(16, r#"<path d="M8 1.8a6.2 6.2 0 1 0 0 12.4c1 0 1.4-.6 1.4-1.3 0-1-.9-1.2-.9-2s.6-1.3 1.5-1.3h1.6a2.6 2.6 0 0 0 2.6-2.6C14.2 4.3 11.4 1.8 8 1.8z"/><circle cx="5" cy="7" r=".6"/><circle cx="7.2" cy="4.6" r=".6"/><circle cx="10.3" cy="5" r=".6"/>"#),
+    layout: stroke_icon(16, r#"<rect x="1.6" y="2.6" width="12.8" height="10.8" rx="1.4"/><path d="M6 2.6v10.8"/>"#),
+    share: stroke_icon(16, r#"<rect x="1.6" y="2.6" width="12.8" height="9" rx="1.4"/><path d="M6 13.7h4M8 9.4V5m-2 2 2-2 2 2"/>"#),
+    network: stroke_icon(16, r#"<circle cx="8" cy="8" r="6.2"/><path d="M1.8 8h12.4M8 1.8c1.8 1.7 2.6 3.8 2.6 6.2S9.8 12.5 8 14.2C6.2 12.5 5.4 10.4 5.4 8S6.2 3.5 8 1.8z"/>"#),
+    info: stroke_icon(16, r#"<circle cx="8" cy="8" r="6.2"/><path d="M8 7.2v4M8 4.9v.1"/>"#),
+    plus: stroke_icon(16, r#"<path d="M8 3v10M3 8h10"/>"#),
 }
 });
 /// A monochrome icon drawn in `tint`.
@@ -171,7 +209,7 @@ fn outline(color: Color, width: f32, r: f32) -> Border {
 /// The edge of a surface above the page (dialogs, the dropdown). No blurred shadow: with the
 /// tiny-skia renderer a blur paints over its own surface and outside the repainted region.
 fn raised_line(t: Tokens) -> Color {
-    if t.dark { t.field_line } else { color!(0xC4CAD3) }
+    if t.dark { t.field_line } else { color!(0xC8C8C8) }
 }
 fn faded(c: Color) -> Color {
     Color { a: c.a * 0.45, ..c }
@@ -198,7 +236,7 @@ fn button_base(
     let style = button::Style {
         background: fill.map(Background::Color),
         text_color: text,
-        border: outline(line, if line.a > 0.0 { 1.0 } else { 0.0 }, 6.0),
+        border: outline(line, if line.a > 0.0 { 1.0 } else { 0.0 }, CONTROL),
         shadow: Shadow::default(),
         snap: true,
     };
@@ -281,7 +319,7 @@ pub fn nav(t: Tokens, active: bool) -> impl Fn(&Theme, button::Status) -> button
     move |_, s| {
         let hovered = matches!(s, button::Status::Hovered | button::Status::Pressed);
         let fill = if active {
-            Some(t.panel)
+            Some(t.selected)
         } else if hovered {
             Some(t.hover)
         } else {
@@ -290,7 +328,20 @@ pub fn nav(t: Tokens, active: bool) -> impl Fn(&Theme, button::Status) -> button
         button::Style {
             background: fill.map(Background::Color),
             text_color: t.ink,
-            border: outline(Color::TRANSPARENT, 0.0, 7.0),
+            border: outline(Color::TRANSPARENT, 0.0, CONTROL),
+            shadow: Shadow::default(),
+            snap: true,
+        }
+    }
+}
+/// A computer in the library: a card of its own that lightens under the pointer.
+pub fn row_card(t: Tokens) -> impl Fn(&Theme, button::Status) -> button::Style {
+    move |_, s| {
+        let hovered = matches!(s, button::Status::Hovered | button::Status::Pressed);
+        button::Style {
+            background: Some(if hovered { t.hover } else { t.panel }.into()),
+            text_color: t.ink,
+            border: outline(t.line, 1.0, SURFACE),
             shadow: Shadow::default(),
             snap: true,
         }
@@ -355,18 +406,36 @@ pub fn card(t: Tokens, r: f32) -> impl Fn(&Theme) -> container::Style {
         ..container::Style::default()
     }
 }
-pub fn inset(t: Tokens) -> impl Fn(&Theme) -> container::Style {
+/// The content pane beside the navigation: a lighter layer whose top-left corner is rounded.
+pub fn layer(t: Tokens) -> impl Fn(&Theme) -> container::Style {
     move |_| container::Style {
-        background: Some(t.base.into()),
-        border: outline(t.line, 1.0, 8.0),
+        background: Some(t.layer.into()),
+        text_color: Some(t.ink),
+        border: Border {
+            color: t.line,
+            width: 1.0,
+            radius: border::Radius::default().top_left(SURFACE),
+        },
         ..container::Style::default()
     }
+}
+/// The rounded square behind a row's or a setting's icon.
+pub fn tile(t: Tokens, tint: Option<Color>) -> impl Fn(&Theme) -> container::Style {
+    move |_| container::Style {
+        background: Some(tint.map_or(t.selected, |c| Color { a: 0.18, ..c }).into()),
+        border: outline(Color::TRANSPARENT, 0.0, CONTROL),
+        ..container::Style::default()
+    }
+}
+/// The accent mark left of the selected navigation item.
+pub fn marker(t: Tokens) -> impl Fn(&Theme) -> container::Style {
+    fill(t.accent, 2.0)
 }
 pub fn dialog(t: Tokens) -> impl Fn(&Theme) -> container::Style {
     move |_| container::Style {
         background: Some(t.panel.into()),
         text_color: Some(t.ink),
-        border: outline(raised_line(t), 1.0, 8.0),
+        border: outline(raised_line(t), 1.0, SURFACE),
         shadow: Shadow::default(),
         snap: true,
     }
@@ -411,7 +480,7 @@ pub fn rule(t: Tokens) -> impl Fn(&Theme) -> container::Style {
 pub fn popup(t: Tokens) -> impl Fn(&Theme) -> container::Style {
     move |_| container::Style {
         background: Some(t.panel.into()),
-        border: outline(raised_line(t), 1.0, 6.0),
+        border: outline(raised_line(t), 1.0, SURFACE),
         ..container::Style::default()
     }
 }
@@ -461,7 +530,7 @@ pub fn field(t: Tokens) -> impl Fn(&Theme, text_input::Status) -> text_input::St
                 t.line
             },
             1.0,
-            5.0,
+            CONTROL,
         ),
         icon: t.mute,
         placeholder: t.mute,
@@ -483,7 +552,7 @@ pub fn pick(t: Tokens) -> impl Fn(&Theme, pick_list::Status) -> pick_list::Style
                 t.line
             },
             1.0,
-            5.0,
+            CONTROL,
         ),
     }
 }
@@ -491,7 +560,7 @@ pub fn pick(t: Tokens) -> impl Fn(&Theme, pick_list::Status) -> pick_list::Style
 pub fn pick_menu(t: Tokens) -> impl Fn(&Theme) -> menu::Style {
     move |_| menu::Style {
         background: t.panel.into(),
-        border: outline(t.line, 1.0, 5.0),
+        border: outline(t.line, 1.0, CONTROL),
         text_color: t.ink,
         selected_text_color: t.ink,
         selected_background: t.selected.into(),

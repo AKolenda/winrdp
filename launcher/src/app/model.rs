@@ -12,6 +12,14 @@ pub enum Page {
     Computers,
     Favourites,
     Open,
+    /// Settings fill the content pane in the full layout; the simple one shows them as a dialog.
+    Settings,
+}
+/// The longer explanations in Settings, each folded under one line until asked for.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Details {
+    Protocol,
+    Sharing,
 }
 
 /// The per-connection options shared by the simple window's options and the computer dialog.
@@ -279,6 +287,7 @@ pub enum Message {
     ConfirmYes,
     CloseDialog,
     OpenSettings,
+    ToggleDetails(Details),
     SetLayout(Layout),
     SetDark(bool),
     // hosting

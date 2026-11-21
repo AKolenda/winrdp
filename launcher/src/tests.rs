@@ -333,14 +333,17 @@ impl Launcher {
             Layout::Simple => "Simple",
             Layout::Full => "Full",
         });
-        let _ = self.click("Close");
+        // The simple window shows Settings as a dialog; the full one as a page.
+        if self.app.dialogs.iter().any(|d| matches!(d, Dialog::Settings)) {
+            let _ = self.click("Close");
+        }
         assert_eq!(self.app.layout, layout);
     }
     /// Filters the workspace to one computer, then opens its edit button.
     fn edit_in_full(&mut self, name: &str) {
         assert_eq!(self.app.layout, Layout::Full);
         self.type_into(FILTER, name);
-        let _ = self.click("\u{2026}");
+        let _ = self.click("Edit");
         assert_eq!(self.computer_form().name, name);
     }
     /// Opens a saved computer the way a user does and signs in; returns the new session.
