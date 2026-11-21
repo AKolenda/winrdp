@@ -2,10 +2,12 @@
 //! The full workspace: navigation, session tabs and the computer library.
 use iced::alignment::{Horizontal, Vertical};
 use iced::widget::text::Wrapping;
-use iced::widget::{Column, Row, Space, button, column, container, hover, mouse_area, row, svg, text, text_input};
+use iced::widget::{
+    Column, Row, Space, button, column, container, hover, mouse_area, responsive, row, svg, text, text_input,
+};
 use iced::{Fill, Length, Padding, Shrink, padding};
 
-use crate::app::{App, FILTER, Message, Page, Session, SessionState, relative_date};
+use crate::app::{App, FILTER, MAIN_SCROLL, Message, Page, Session, SessionState, relative_date};
 use crate::library::{Layout, Profile};
 use crate::style::{self, ICONS, Tokens, icon};
 
@@ -142,6 +144,7 @@ pub(super) fn view(app: &App, t: Tokens) -> Element<'_> {
                 left: 32.0,
             }),
         )
+        .id(MAIN_SCROLL)
         .height(Fill),
     )
     .width(Fill)
@@ -308,37 +311,48 @@ fn library_row<'a>(app: &'a App, t: Tokens, p: &'a Profile, hovered: bool) -> El
         Some(s) => Message::Disconnect(s.id.clone()),
         None => Message::RowPressed(p.id.clone()),
     };
-    // No colour of its own: the label takes the button's, which changes with the row's hover.
-    let go = button(text(if live.is_some() { "Disconnect" } else { "Connect" }).size(14))
-        .padding([6, 14])
-        .style(style::go_hovered(t, live.is_some(), hovered))
-        .on_press(go_message);
-    let edit = button(
-        row![icon(&ICONS.pencil, 14.0, t.mute), label("Edit", 13.0, t.mute)]
+    let live = live.is_some();
+    // The status steps aside when the window is narrow, so the name keeps room to be read.
+    let content = responsive(move |size| {
+        // No colour of its own: the label takes the button's, which changes with the row's hover.
+        let go = button(text(if live { "Disconnect" } else { "Connect" }).size(14))
+            .padding([6, 14])
+            .style(style::go_hovered(t, live, hovered))
+            .on_press(go_message.clone());
+        let edit = button(
+            row![icon(&ICONS.pencil, 14.0, t.mute), label("Edit", 13.0, t.mute)]
+                .spacing(6)
+                .align_y(Vertical::Center),
+        )
+        .padding([7, 10])
+        .style(style::quiet(t))
+        .on_press(Message::Edit(p.id.clone()));
+        let tile = container(icon(&ICONS.monitor, 18.0, if live { t.live } else { t.ink }))
+            .center(36)
+            .style(style::tile(t, live.then_some(t.live)));
+        let mut name = row![strong(p.name.as_str(), 14.0, t.ink).wrapping(Wrapping::None)]
             .spacing(6)
-            .align_y(Vertical::Center),
-    )
-    .padding([7, 10])
-    .style(style::quiet(t))
-    .on_press(Message::Edit(p.id.clone()));
-    let tile = container(icon(&ICONS.monitor, 18.0, if live.is_some() { t.live } else { t.ink }))
-        .center(36)
-        .style(style::tile(t, live.is_some().then_some(t.live)));
-    let mut name = row![container(strong(p.name.as_str(), 14.0, t.ink).wrapping(Wrapping::None)).clip(true)]
-        .spacing(6)
+            .align_y(Vertical::Center);
+        if p.favorite {
+            name = name.push(icon(&ICONS.star_filled, 12.0, t.mute));
+        }
+        let mut content = row![
+            tile,
+            column![
+                container(name).width(Fill).clip(true),
+                line(detail.clone(), 12.0, t.mute, Fill)
+            ]
+            .spacing(2)
+            .width(Fill),
+        ]
+        .spacing(16)
+        .height(Fill)
         .align_y(Vertical::Center);
-    if p.favorite {
-        name = name.push(icon(&ICONS.star_filled, 12.0, t.mute));
-    }
-    let content = row![
-        tile,
-        column![name, line(detail, 12.0, t.mute, Fill)].spacing(2).width(Fill),
-        line(state, 12.0, if live.is_some() { t.live } else { t.mute }, 170),
-        row![go, edit].spacing(4).align_y(Vertical::Center),
-    ]
-    .spacing(16)
-    .height(Fill)
-    .align_y(Vertical::Center);
+        if size.width >= 600.0 {
+            content = content.push(line(state.clone(), 12.0, if live { t.live } else { t.mute }, 170));
+        }
+        content.push(row![go, edit].spacing(4).align_y(Vertical::Center)).into()
+    });
     button(content)
         .width(Fill)
         .height(Length::Fixed(64.0))

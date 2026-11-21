@@ -113,7 +113,7 @@ fn indented<'a>(content: impl Into<Element<'a>>) -> Element<'a> {
         .into()
 }
 /// A row that folds an explanation away; the chevron shows which way it is.
-fn expander<'a>(app: &App, t: Tokens, which: Details, title: &'a str, body: &'a str) -> Vec<Element<'a>> {
+fn expander<'a>(app: &App, t: Tokens, which: Details, title: &'a str, body: &'a str) -> Element<'a> {
     let open = app.details.contains(&which);
     let header = button(
         row![
@@ -136,11 +136,11 @@ fn expander<'a>(app: &App, t: Tokens, which: Details, title: &'a str, body: &'a 
     .padding([14, 16])
     .style(style::quiet(t))
     .on_press(Message::ToggleDetails(which));
-    let mut rows = vec![header.into()];
+    let mut rows = column![header];
     if open {
-        rows.push(indented(label(body, 13.0, t.mute)));
+        rows = rows.push(indented(label(body, 13.0, t.mute)));
     }
-    rows
+    rows.into()
 }
 /// Settings rows on one card, a hairline between them.
 fn card<'a>(t: Tokens, rows: Vec<Element<'a>>) -> Element<'a> {
@@ -201,7 +201,7 @@ fn sharing<'a>(app: &'a App, t: Tokens) -> Vec<Element<'a>> {
             },
         ),
     };
-    let mut rows: Vec<Element<'_>> = vec![switch_setting(
+    let switch = switch_setting(
         t,
         &ICONS.share,
         "Accept connections from Windows",
@@ -212,7 +212,7 @@ fn sharing<'a>(app: &'a App, t: Tokens) -> Vec<Element<'a>> {
         }),
         on,
         (status.available && !host.busy).then_some(Message::HostSwitch),
-    )];
+    );
     let mut inner = Column::new().spacing(2);
     let explained = !explanation.is_empty();
     if explained {
@@ -262,9 +262,14 @@ fn sharing<'a>(app: &'a App, t: Tokens) -> Vec<Element<'a>> {
             .padding(padding::top(6)),
         );
     }
-    if explained || (status.available && !host.busy) || host.needs_credentials() {
-        rows.push(indented(inner));
-    }
+    // What the switch needs said or chosen sits under it, on the same row of the card.
+    let mut rows: Vec<Element<'_>> = vec![
+        if explained || (!host.busy && (status.available || host.needs_credentials())) {
+            column![switch, indented(inner)].into()
+        } else {
+            switch
+        },
+    ];
     let open = button(
         row![label("Open", 13.0, t.ink), icon(&ICONS.external, 14.0, t.ink)]
             .spacing(8)
@@ -288,7 +293,7 @@ fn sharing<'a>(app: &'a App, t: Tokens) -> Vec<Element<'a>> {
         None,
         Some(row![refresh, open].spacing(8).into()),
     ));
-    rows.extend(expander(
+    rows.push(expander(
         app,
         t,
         Details::Sharing,
@@ -307,9 +312,9 @@ fn body(app: &App, t: Tokens) -> Column<'_, Message> {
         &ICONS.network,
         "UDP when the computer allows it",
         Some("Otherwise the desktop opens over TCP, by itself.".into()),
-        Some(label("Automatic", 13.0, t.mute).into()),
+        None,
     )];
-    connecting.extend(expander(
+    connecting.push(expander(
         app,
         t,
         Details::Protocol,
@@ -399,12 +404,11 @@ pub(super) fn view(app: &App, t: Tokens) -> Element<'_> {
         Space::new().width(Fill),
         footer_button(t, "Close", false, Some(Message::CloseDialog))
     ];
-    let height = if app.layout == Layout::Simple { 470.0 } else { 600.0 };
     dialog_frame(
         t,
-        600.0,
+        560.0,
         Some("Settings"),
-        scroll(t, content).height(Length::Fixed(height)).into(),
+        scroll(t, content).height(Length::Fixed(470.0)).into(),
         footer.into(),
     )
 }

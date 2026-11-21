@@ -29,8 +29,8 @@ use iced_test::selector::{Candidate, Target};
 use iced_test::simulator::{click, press_key, release_key};
 
 use crate::app::{
-    App, COMPUTER_BOX, ComputerForm, Dialog, FILTER, FORM_NAME, FORM_USERNAME, Message, PASSWORD, looks_like_address,
-    relative_date, window_size,
+    App, COMPUTER_BOX, ComputerForm, Dialog, FILTER, FORM_NAME, FORM_USERNAME, Message, PASSWORD, Page,
+    looks_like_address, relative_date, window_size,
 };
 use crate::backend::{Backend, CredentialFuture, Credentials, Demo, Ended, Live, Report, Status, Transport};
 use crate::library::{Layout, Library, Preferences, Profile, format_iso, parse_iso};
@@ -333,9 +333,11 @@ impl Launcher {
             Layout::Simple => "Simple",
             Layout::Full => "Full",
         });
-        // The simple window shows Settings as a dialog; the full one as a page.
+        // Settings follow the switch: a dialog in the simple window, a page in the full one.
         if self.app.dialogs.iter().any(|d| matches!(d, Dialog::Settings)) {
             let _ = self.click("Close");
+        } else {
+            let _ = self.click("Computers");
         }
         assert_eq!(self.app.layout, layout);
     }
@@ -1286,8 +1288,9 @@ fn choosing_the_full_layout_in_settings_saves_it() {
     launcher.open_settings();
     launcher.click_choice("Full");
     assert_eq!(launcher.demo.borrow().library.preferences.layout, Layout::Full);
-    let _ = launcher.click("Close");
     assert!(launcher.shows("Favourites"), "the window changed to the full layout");
+    assert_eq!(launcher.app.page, Page::Settings, "Settings stay open, now as a page");
+    assert!(launcher.app.dialogs.is_empty());
 }
 
 #[test]

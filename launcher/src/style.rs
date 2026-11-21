@@ -34,14 +34,14 @@ pub const LIGHT: Tokens = Tokens {
     ink: color!(0x1A1A1A),
     mute: color!(0x5F5F5F),
     line: color!(0xE5E5E5),
-    hover: color!(0xF0F0F0),
-    selected: color!(0xEAEAEA),
+    hover: color!(0xEAEAEA),
+    selected: color!(0xE5E5E5),
     accent: color!(0x005FB8),
     accent_ink: color!(0xFFFFFF),
     live: color!(0x0F7B0F),
     danger: color!(0xC42B1C),
     field: color!(0xFFFFFF),
-    field_line: color!(0xD1D1D1),
+    field_line: color!(0x8A8A8A),
     dark: false,
 };
 pub const DARK: Tokens = Tokens {
@@ -50,7 +50,7 @@ pub const DARK: Tokens = Tokens {
     panel: color!(0x2D2D2D),
     ink: color!(0xFFFFFF),
     mute: color!(0xC5C5C5),
-    line: color!(0x1D1D1D),
+    line: color!(0x3A3A3A),
     hover: color!(0x353535),
     selected: color!(0x333333),
     accent: color!(0x60CDFF),
@@ -58,7 +58,7 @@ pub const DARK: Tokens = Tokens {
     live: color!(0x6CCB5F),
     danger: color!(0xFF99A4),
     field: color!(0x2B2B2B),
-    field_line: color!(0x454545),
+    field_line: color!(0x9A9A9A),
     dark: true,
 };
 /// Control corners (buttons, fields, navigation items).
@@ -209,7 +209,7 @@ fn outline(color: Color, width: f32, r: f32) -> Border {
 /// The edge of a surface above the page (dialogs, the dropdown). No blurred shadow: with the
 /// tiny-skia renderer a blur paints over its own surface and outside the repainted region.
 fn raised_line(t: Tokens) -> Color {
-    if t.dark { t.field_line } else { color!(0xC8C8C8) }
+    if t.dark { color!(0x454545) } else { color!(0xC8C8C8) }
 }
 fn faded(c: Color) -> Color {
     Color { a: c.a * 0.45, ..c }
@@ -373,13 +373,7 @@ pub fn go(t: Tokens, live: bool) -> impl Fn(&Theme, button::Status) -> button::S
         let hovered = matches!(s, button::Status::Hovered | button::Status::Pressed);
         let tone = if live { t.danger } else { t.accent };
         if hovered {
-            button_base(
-                s,
-                Some(tone),
-                None,
-                if live { Color::WHITE } else { t.accent_ink },
-                Color::TRANSPARENT,
-            )
+            button_base(s, Some(tone), None, t.accent_ink, Color::TRANSPARENT)
         } else {
             button_base(s, Some(t.panel), None, tone, t.line)
         }
