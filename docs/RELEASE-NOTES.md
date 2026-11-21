@@ -1,3 +1,18 @@
+# Win RDP 0.8.4
+
+- The IronRDP fork is rebased onto current upstream IronRDP again. Fixes upstream has
+  merged since, for Windows 11 progressive graphics, the bitmap cache across a resize,
+  an early drive-redirection logon, GNOME Remote Desktop's audio channel and the Linux
+  clipboard, now come from upstream's code, and the fork keeps only its remaining changes.
+- A resize the computer answers with a size other than the one asked for no longer ends
+  in a reconnect after the timeout.
+- Network probes that Windows sends while it reapplies the session after a resize no
+  longer end the session.
+
+This release was checked with the build, lint, test and notice checks, and the package
+was installed with apt on clean Ubuntu 22.04 and 24.04 and Debian 12 and 13. It has not
+been tested against a Windows PC or on native Wayland.
+
 # Win RDP 0.8.3
 
 - A remembered password belongs to the computer's address and account as well as the
