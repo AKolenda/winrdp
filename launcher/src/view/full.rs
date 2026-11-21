@@ -168,8 +168,8 @@ fn library<'a>(app: &'a App, t: Tokens, mut page: Column<'a, Message>) -> Column
         .spacing(10)
         .align_y(Vertical::Center),
     )
-    .max_width(380)
     .width(Fill)
+    .max_width(380)
     .height(32)
     .padding([0, 10])
     .align_y(Vertical::Center)
@@ -186,7 +186,7 @@ fn library<'a>(app: &'a App, t: Tokens, mut page: Column<'a, Message>) -> Column
     .style(style::primary(t))
     .on_press(Message::NewComputer);
     page = page.push(
-        row![search, Space::new().width(Fill), new_computer]
+        row![container(search).width(Fill), new_computer]
             .spacing(12)
             .align_y(Vertical::Center),
     );
@@ -330,12 +330,16 @@ fn library_row<'a>(app: &'a App, t: Tokens, p: &'a Profile, hovered: bool) -> El
         let tile = container(icon(&ICONS.monitor, 18.0, if live { t.live } else { t.ink }))
             .center(36)
             .style(style::tile(t, live.then_some(t.live)));
-        let mut name = row![strong(p.name.as_str(), 14.0, t.ink).wrapping(Wrapping::None)]
-            .spacing(6)
-            .align_y(Vertical::Center);
+        // The star leads, so a long name is what gets clipped, never the star.
+        let mut name = row![].spacing(6).align_y(Vertical::Center);
         if p.favorite {
             name = name.push(icon(&ICONS.star_filled, 12.0, t.mute));
         }
+        let name = name.push(
+            container(strong(p.name.as_str(), 14.0, t.ink).wrapping(Wrapping::None))
+                .width(Fill)
+                .clip(true),
+        );
         let mut content = row![
             tile,
             column![
