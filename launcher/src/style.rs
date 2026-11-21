@@ -139,7 +139,6 @@ pub struct Icons {
     pub chevron_right: svg::Handle,
     pub search: svg::Handle,
     pub monitor: svg::Handle,
-    pub more: svg::Handle,
     pub add_computer: svg::Handle,
     pub star: svg::Handle,
     pub star_filled: svg::Handle,
@@ -169,7 +168,6 @@ pub static ICONS: LazyLock<Icons> = LazyLock::new(|| {
     chevron_right: stroke_icon(16, r#"<path d="m6 4 4 4-4 4"/>"#),
     search: stroke_icon(20, r#"<circle cx="8.5" cy="8.5" r="5.5"/><path d="m13 13 4 4"/>"#),
     monitor: stroke_icon(16, r#"<rect x="1.6" y="2.6" width="12.8" height="9" rx="1.4"/><path d="M6 13.7h4"/>"#),
-    more: svg::Handle::from_memory(br##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="#000"><circle cx="3" cy="8" r="1.1"/><circle cx="8" cy="8" r="1.1"/><circle cx="13" cy="8" r="1.1"/></svg>"##.as_slice()),
     add_computer: stroke_icon(48, r#"<rect x="7" y="9" width="34" height="24" rx="3"/><path d="M24 33v6m-9 0h18m-9-24v12m-6-6h12"/>"#),
     star: stroke_icon(16, STAR),
     star_filled: svg::Handle::from_memory(format!(
@@ -262,6 +260,16 @@ pub fn plain(t: Tokens) -> impl Fn(&Theme, button::Status) -> button::Style {
 }
 pub fn primary(t: Tokens) -> impl Fn(&Theme, button::Status) -> button::Style {
     move |_, s| {
+        // Disabled, an accent button turns neutral rather than a washed-out accent.
+        if s == button::Status::Disabled {
+            return button::Style {
+                background: Some(t.selected.into()),
+                text_color: Color { a: 0.7, ..t.mute },
+                border: outline(Color::TRANSPARENT, 0.0, CONTROL),
+                shadow: Shadow::default(),
+                snap: true,
+            };
+        }
         button_base(
             s,
             Some(t.accent),
@@ -410,6 +418,22 @@ pub fn layer(t: Tokens) -> impl Fn(&Theme) -> container::Style {
             width: 1.0,
             radius: border::Radius::default().top_left(SURFACE),
         },
+        ..container::Style::default()
+    }
+}
+/// The simple window's content: the lighter layer, edge to edge.
+pub fn layer_plain(t: Tokens) -> impl Fn(&Theme) -> container::Style {
+    move |_| container::Style {
+        background: Some(t.layer.into()),
+        text_color: Some(t.ink),
+        ..container::Style::default()
+    }
+}
+/// A card in its own fill, for list items that show hover and selection.
+pub fn card_fill(t: Tokens, fill: Color) -> impl Fn(&Theme) -> container::Style {
+    move |_| container::Style {
+        background: Some(fill.into()),
+        border: outline(t.line, 1.0, SURFACE),
         ..container::Style::default()
     }
 }
