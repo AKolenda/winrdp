@@ -329,7 +329,7 @@ impl RpcApp {
                     }
                 }
             }
-            InputTarget::Rpc(daemon) => match daemon.try_resize(width, height) {
+            InputTarget::Rpc(daemon) => match daemon.try_resize(width, height, scale_factor) {
                 Ok(()) => self.last_size = None,
                 Err(ResizeError::Full) => self.resize_timeout = Some(Instant::now() + Duration::from_millis(10)),
                 Err(error) => {
@@ -1118,6 +1118,25 @@ impl RpcApp {
             // Only sent to a client built with `with_desktop_updates`; the session uses a
             // shared framebuffer instead.
             RdpOutputEvent::DesktopUpdate(_) => {}
+            RdpOutputEvent::MonitorLayoutRejected => {
+                warn!("The computer rejected the requested monitor layout");
+            }
+            RdpOutputEvent::ServerRedirected { target } => info!(%target, "Redirected to another server"),
+            RdpOutputEvent::LogonError(info) => debug!(?info, "Logon error reported"),
+            RdpOutputEvent::NetworkCharacteristics {
+                base_rtt_ms,
+                bandwidth_kbps,
+                average_rtt_ms,
+            } => debug!(base_rtt_ms, bandwidth_kbps, average_rtt_ms, "Network characteristics"),
+            // Events for features this window does not offer: RemoteApp windows, touch input and
+            // Microsoft Entra sign-in. A dropped sign-in request is reported to the server as
+            // cancelled. Listed one by one so that a new event fails the build until it is handled.
+            RdpOutputEvent::ServerInputFlags(_)
+            | RdpOutputEvent::RemoteSessionId(_)
+            | RdpOutputEvent::WindowSurfaceUpdates(_)
+            | RdpOutputEvent::RdpeiInputState(_)
+            | RdpOutputEvent::InteractiveEntraAuthRequested(_)
+            | RdpOutputEvent::InteractiveEntraAuthCompleted { .. } => {}
         }
     }
 }

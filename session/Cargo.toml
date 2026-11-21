@@ -30,7 +30,11 @@ native-tls = ["ironrdp/native-tls"]
 # Our fork (third_party/ironrdp, branch winrdp) of IronRDP, rebased on upstream master.
 ironrdp-daemon = { path = "../third_party/ironrdp/crates/ironrdp-daemon" }
 ironrdp-rpc = { path = "../third_party/ironrdp/crates/ironrdp-rpc" }
-ironrdp = { path = "../third_party/ironrdp/crates/ironrdp", features = ["connector", "cliprdr", "input", "pdu", "client", "client-all", "client-vmconnect"] }
+ironrdp = { path = "../third_party/ironrdp/crates/ironrdp", features = ["connector", "cliprdr", "input", "pdu", "client"] }
+# The client's protocol features, chosen here rather than through `ironrdp/client-all`, which
+# also turns on Windows 365, USB, camera and cloud support this window does not offer.
+# `ironrdp-daemon` turns on Microsoft Entra sign-in and video redirection for itself.
+ironrdp-client = { path = "../third_party/ironrdp/crates/ironrdp-client", features = ["sound", "clipboard", "rdpdr", "smartcard", "gateway", "dvc-pipe-proxy", "dvc-com-plugin", "webauthn", "vmconnect", "location", "udp"] }
 ironrdp-cfg = { path = "../third_party/ironrdp/crates/ironrdp-cfg" }
 ironrdp-propertyset = { path = "../third_party/ironrdp/crates/ironrdp-propertyset" }
 ironrdp-rdpfile = { path = "../third_party/ironrdp/crates/ironrdp-rdpfile" }
@@ -51,3 +55,7 @@ tap = "1"
 semver = "1"
 url = "2"
 ab_glyph = "0.2"
+
+[package.metadata.cargo-machete]
+# Used only to select `ironrdp-client` features; the code reaches it through `ironrdp::client`.
+ignored = ["ironrdp-client"]
