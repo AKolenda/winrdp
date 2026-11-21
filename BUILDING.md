@@ -49,7 +49,7 @@ a Rust audio crate uses to build the Opus codec it bundles. Keep the committed
 ```sh
 cargo xtask preflight
 cargo xtask deb
-sudo apt install ./dist/winrdp-next_0.8.3_amd64.deb
+sudo apt install ./dist/winrdp-next_0.8.4_amd64.deb
 winrdp-next
 ```
 
