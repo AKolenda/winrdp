@@ -18,11 +18,26 @@ pub(super) fn view(app: &App, t: Tokens) -> Element<'_> {
     let tabs = Row::with_children(app.sessions.iter().map(|s| tab(t, s)))
         .spacing(2)
         .align_y(Vertical::Bottom);
+    // The title bar carries the app's name and the open desktops, as a Windows app's does,
+    // so no band of it is left empty; the name drags the window like the rest of the bar.
+    let identity = mouse_area(
+        container(
+            row![
+                svg(ICONS.logo.clone()).width(16).height(16),
+                label("Win RDP", 12.0, t.ink)
+            ]
+            .spacing(12)
+            .align_y(Vertical::Center),
+        )
+        .height(Fill)
+        .align_y(Vertical::Center)
+        .padding(padding::left(17).right(14)),
+    )
+    .on_press(Message::Drag)
+    .on_double_click(Message::ToggleMaximize);
     let caption = row![
-        container(tabs)
-            .height(Fill)
-            .align_y(Vertical::Bottom)
-            .padding(padding::left(10)),
+        identity,
+        container(tabs).height(Fill).align_y(Vertical::Bottom),
         mouse_area(Space::new().width(Fill).height(Fill))
             .on_press(Message::Drag)
             .on_double_click(Message::ToggleMaximize),
@@ -31,7 +46,7 @@ pub(super) fn view(app: &App, t: Tokens) -> Element<'_> {
         caption_button(t, &ICONS.maximize, Message::ToggleMaximize, false),
         caption_button(t, &ICONS.close, Message::CloseRequested, true),
     ]
-    .height(40);
+    .height(36);
     let count = |n: usize| if n == 0 { String::new() } else { n.to_string() };
     // A navigation item: the selected one carries an accent mark at its left edge.
     let nav_item = |glyph: &svg::Handle, caption: &'static str, active: bool, n: usize, message: Message| {
@@ -73,18 +88,6 @@ pub(super) fn view(app: &App, t: Tokens) -> Element<'_> {
         nav_item(glyph, caption, app.page == page, n, Message::ShowPage(page))
     };
     let sidebar = column![
-        row![
-            svg(ICONS.logo.clone()).width(20).height(20),
-            strong("Win RDP", 14.0, t.ink)
-        ]
-        .spacing(12)
-        .align_y(Vertical::Center)
-        .padding(Padding {
-            top: 2.0,
-            right: 12.0,
-            bottom: 18.0,
-            left: 15.0
-        }),
         page_item(
             &ICONS.monitor,
             "Computers",
@@ -116,7 +119,7 @@ pub(super) fn view(app: &App, t: Tokens) -> Element<'_> {
     .spacing(4)
     .width(232)
     .padding(Padding {
-        top: 8.0,
+        top: 4.0,
         right: 8.0,
         bottom: 12.0,
         left: 8.0,
@@ -138,7 +141,7 @@ pub(super) fn view(app: &App, t: Tokens) -> Element<'_> {
         scroll(
             t,
             container(page.max_width(1040)).width(Fill).padding(Padding {
-                top: 24.0,
+                top: 16.0,
                 right: 32.0,
                 bottom: 28.0,
                 left: 32.0,
