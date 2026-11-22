@@ -84,7 +84,11 @@ pub fn view(app: &App) -> Element<'_> {
                 .height(Fill)
                 .align_x(Horizontal::Center)
                 .align_y(Vertical::Bottom)
-                .padding(16)
+                // The simple window's Connect sits in a footer at the bottom; the notice stays above it.
+                .padding(Padding {
+                    bottom: if app.layout == Layout::Simple { 72.0 } else { 16.0 },
+                    ..Padding::new(16.0)
+                })
                 .into(),
         );
     }

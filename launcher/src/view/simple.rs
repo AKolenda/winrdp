@@ -1,22 +1,22 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! The compact launcher, its recent computers and address suggestions.
 use iced::alignment::{Horizontal, Vertical};
-use iced::widget::text::LineHeight;
+use iced::widget::text::{LineHeight, Wrapping};
 use iced::widget::{Column, Space, button, column, container, hover, mouse_area, row, stack, svg, text_input};
-use iced::{Color, Fill, Padding, padding};
+use iced::{Fill, Padding, padding};
 
 use crate::app::{App, COMPUTER_BOX, Message, Session, looks_like_address};
 use crate::library::{Layout, Profile};
-use crate::style::{self, ICONS, Tokens, bold, icon};
+use crate::style::{self, ICONS, Tokens, icon};
 
 use super::Element;
 use super::widgets::{caption_button, connection_options, hrule, label, line, resolution_picker, scroll, strong};
 
 pub(super) fn view(app: &App, t: Tokens) -> Element<'_> {
     let caption = row![
-        Space::new().width(12),
+        Space::new().width(17),
         svg(ICONS.logo.clone()).width(16).height(16),
-        Space::new().width(8),
+        Space::new().width(12),
         label("Win RDP", 12.0, t.ink),
         mouse_area(Space::new().width(Fill).height(Fill)).on_press(Message::Drag),
         caption_button(t, &ICONS.expand, Message::SetLayout(Layout::Full), false),
@@ -24,7 +24,7 @@ pub(super) fn view(app: &App, t: Tokens) -> Element<'_> {
         caption_button(t, &ICONS.minimize, Message::Minimize, false),
         caption_button(t, &ICONS.close, Message::CloseRequested, true),
     ]
-    .height(40)
+    .height(36)
     .align_y(Vertical::Center);
 
     let combo = stack![
@@ -86,30 +86,24 @@ pub(super) fn view(app: &App, t: Tokens) -> Element<'_> {
 
     let recent = app.recent();
     let list: Element<'_> = if recent.is_empty() {
-        column![
-            hrule(t),
-            container(label(
-                "No saved computers yet. Type an address above and press Enter.",
-                13.0,
-                t.mute
-            ))
-            .padding([14, 4])
-        ]
+        container(label(
+            "No saved computers yet. Type an address above and press Enter.",
+            13.0,
+            t.mute,
+        ))
+        .padding([14, 4])
         .height(Fill)
         .into()
     } else {
-        column![
-            hrule(t),
-            scroll(
-                t,
-                Column::with_children(
-                    recent
-                        .into_iter()
-                        .map(|p| { hover(recent_item(app, t, p, false), recent_item(app, t, p, true)) })
-                )
+        scroll(
+            t,
+            Column::with_children(
+                recent
+                    .into_iter()
+                    .map(|p| hover(recent_item(app, t, p, false), recent_item(app, t, p, true))),
             )
-            .height(Fill)
-        ]
+            .spacing(4),
+        )
         .height(Fill)
         .into()
     };
@@ -141,53 +135,67 @@ pub(super) fn view(app: &App, t: Tokens) -> Element<'_> {
     .padding([6, 4])
     .style(style::quiet(t))
     .on_press(Message::OptionsToggle);
-    let connect = button(label("Connect", 13.0, t.accent_ink).font(bold()))
-        .padding([8, 16])
+    let connect = button(label("Connect", 14.0, t.accent_ink))
+        .padding([7, 20])
         .style(style::primary(t))
         .on_press_maybe(app.can_connect_simple().then_some(Message::ConnectChosen));
+    // The options open as a card above the footer, pushing the list up rather than off the window.
     let options: Element<'_> = if app.options_open {
-        column![hrule(t)]
-            .extend(connection_options(t, app.options, Message::SetConnectionOption))
-            .push(resolution_picker(t, app.options.resolution, Message::SetResolution))
-            .push(
-                row![
-                    button(label("New computer\u{2026}", 13.0, t.ink))
-                        .padding([5, 8])
-                        .style(style::quiet(t))
-                        .on_press(Message::NewFromBox),
-                    button(label("Edit\u{2026}", 13.0, t.ink))
-                        .padding([5, 8])
-                        .style(style::quiet(t))
-                        .on_press_maybe(app.chosen.as_ref().map(|_| Message::EditChosen)),
-                ]
-                .spacing(6),
-            )
-            .spacing(8)
-            .padding(padding::top(10).bottom(2))
-            .into()
+        container(
+            column![]
+                .extend(connection_options(t, app.options, Message::SetConnectionOption))
+                .push(resolution_picker(t, app.options.resolution, Message::SetResolution))
+                .push(
+                    row![
+                        button(label("New computer\u{2026}", 13.0, t.ink))
+                            .padding([5, 10])
+                            .style(style::plain(t))
+                            .on_press(Message::NewFromBox),
+                        button(label("Edit\u{2026}", 13.0, t.ink))
+                            .padding([5, 10])
+                            .style(style::plain(t))
+                            .on_press_maybe(app.chosen.as_ref().map(|_| Message::EditChosen)),
+                    ]
+                    .spacing(8),
+                )
+                .spacing(10),
+        )
+        .width(Fill)
+        .padding([14, 16])
+        .style(style::card(t, style::SURFACE))
+        .into()
     } else {
         Space::new().into()
     };
 
     let body = column![
-        Space::new().height(10),
+        Space::new().height(14),
         label("Computer", 12.0, t.mute).line_height(LineHeight::Absolute(17.0.into())),
         Space::new().height(6),
         combo,
         container(signin).padding(padding::top(8)),
-        container(strong("Recent", 12.0, t.mute)).padding(padding::top(18).bottom(2)),
+        container(strong("Recent", 14.0, t.ink)).padding(padding::top(20).bottom(8)),
         list,
-        container(row![disclosure, Space::new().width(Fill), connect].align_y(Vertical::Center))
-            .padding(padding::top(14)),
-        options,
+        container(options).padding(padding::top(8)),
     ]
     .padding(Padding {
-        top: 4.0,
-        right: 22.0,
-        bottom: 18.0,
-        left: 22.0,
+        top: 0.0,
+        right: 20.0,
+        bottom: 12.0,
+        left: 20.0,
     });
-    column![caption, body].into()
+    // Like a Windows dialog: the content on the lighter layer, the commit row on the darker base.
+    let footer = container(row![disclosure, Space::new().width(Fill), connect].align_y(Vertical::Center))
+        .width(Fill)
+        .padding([12, 20]);
+    column![
+        caption,
+        hrule(t),
+        container(body).width(Fill).height(Fill).style(style::layer_plain(t)),
+        hrule(t),
+        footer,
+    ]
+    .into()
 }
 fn recent_item<'a>(app: &'a App, t: Tokens, p: &'a Profile, hovered: bool) -> Element<'a> {
     let live = app.live_for(&p.id);
@@ -202,27 +210,52 @@ fn recent_item<'a>(app: &'a App, t: Tokens, p: &'a Profile, hovered: bool) -> El
         })
         .unwrap_or_default();
     let tag_udp = live.is_some_and(Session::udp);
-    let more: Element<'_> = if hovered || selected {
-        button(container(icon(&ICONS.more, 16.0, t.mute)).center(Fill))
-            .width(28)
-            .height(26)
+    let edit: Element<'_> = if hovered || selected {
+        button(container(icon(&ICONS.pencil, 14.0, t.mute)).center(Fill))
+            .width(30)
+            .height(30)
             .padding(0)
             .style(style::quiet_mute(t))
             .on_press(Message::Edit(p.id.clone()))
             .into()
     } else {
-        Space::new().width(28).into()
+        Space::new().width(30).into()
     };
     let tag_text = if tag_udp {
         strong(tag, 11.0, t.accent)
     } else {
-        label(tag, 11.0, t.mute)
+        label(tag, 11.0, if live.is_some() { t.live } else { t.mute })
     };
+    // The chosen computer carries the same accent mark as the full window's navigation.
+    let mark: Element<'_> = if selected {
+        container(Space::new().width(3).height(16))
+            .style(style::marker(t))
+            .into()
+    } else {
+        Space::new().width(3).into()
+    };
+    // Connected computers tint their tile green; the chosen one, in the accent.
+    let tint = if live.is_some() {
+        Some(t.live)
+    } else {
+        selected.then_some(t.accent)
+    };
+    let tile = container(icon(&ICONS.monitor, 16.0, tint.unwrap_or(t.ink)))
+        .center(32)
+        .style(style::tile(t, tint));
     let content = row![
-        line(p.name.as_str(), 13.0, t.ink, Fill),
-        label(p.address.as_str(), 13.0, t.mute),
-        container(tag_text).width(60).align_x(Horizontal::Right),
-        more,
+        mark,
+        tile,
+        column![
+            container(strong(p.name.as_str(), 14.0, t.ink).wrapping(Wrapping::None))
+                .width(Fill)
+                .clip(true),
+            line(p.address.as_str(), 12.0, t.mute, Fill)
+        ]
+        .spacing(1)
+        .width(Fill),
+        tag_text,
+        edit,
     ]
     .spacing(10)
     .align_y(Vertical::Center);
@@ -231,21 +264,18 @@ fn recent_item<'a>(app: &'a App, t: Tokens, p: &'a Profile, hovered: bool) -> El
     } else if hovered {
         t.hover
     } else {
-        Color::TRANSPARENT
+        t.panel
     };
-    let item = column![
-        container(content)
-            .height(35)
-            .padding(Padding {
-                top: 0.0,
-                right: 2.0,
-                bottom: 0.0,
-                left: 8.0
-            })
-            .align_y(Vertical::Center)
-            .style(style::fill(fill, 3.0)),
-        hrule(t)
-    ];
+    let item = container(content)
+        .height(52)
+        .padding(Padding {
+            top: 0.0,
+            right: 8.0,
+            bottom: 0.0,
+            left: 4.0,
+        })
+        .align_y(Vertical::Center)
+        .style(style::card_fill(t, fill));
     mouse_area(item)
         .on_press(Message::Choose(p.id.clone()))
         .on_double_click(Message::Activate(p.id.clone()))
@@ -271,14 +301,14 @@ pub(super) fn combo_list<'a>(t: Tokens, items: Vec<&'a Profile>) -> Element<'a> 
         .max_height(220)
         .width(Fill)
         .style(style::popup(t));
-    // Below the Computer box: caption 40 + padding 4 + label block 33 + box 36 + gap 4.
+    // Below the Computer box: caption 36 + rule 1 + label block 37 + box 36 + gap 4.
     container(popup)
         .width(Fill)
         .padding(Padding {
-            top: 117.0,
-            right: 21.0,
+            top: 114.0,
+            right: 19.0,
             bottom: 0.0,
-            left: 21.0,
+            left: 19.0,
         })
         .into()
 }

@@ -9,7 +9,7 @@ mod host_tests;
 mod model;
 
 pub use model::{
-    ComputerForm, Confirm, ConnectionOption, ConnectionOptions, Dialog, Message, Page, PasswordForm, Session,
+    ComputerForm, Confirm, ConnectionOption, ConnectionOptions, Details, Dialog, Message, Page, PasswordForm, Session,
     SessionState,
 };
 use model::{Confirmed, HostPanel, Secret, Toast};
@@ -31,6 +31,8 @@ pub const PASSWORD: &str = "password";
 pub const FORM_NAME: &str = "form-name";
 pub const FORM_USERNAME: &str = "form-username";
 pub const HOST_USER: &str = "host-user";
+/// The scrolling content pane of the full window.
+pub const MAIN_SCROLL: &str = "main-scroll";
 
 pub struct App {
     backend: Box<dyn Backend>,
@@ -39,6 +41,8 @@ pub struct App {
     pub user: String,
     pub layout: Layout,
     pub page: Page,
+    /// The Settings explanations unfolded right now.
+    pub details: Vec<Details>,
     // simple layout
     pub computer_box: String,
     pub chosen: Option<String>,
@@ -106,6 +110,7 @@ impl App {
             user: std::env::var("USER").unwrap_or_default(),
             layout,
             page: Page::Computers,
+            details: Vec::new(),
             computer_box: String::new(),
             chosen: None,
             combo_open: false,
@@ -209,6 +214,24 @@ impl App {
     pub fn apply_layout(&mut self, layout: Layout) -> Task<Message> {
         self.layout = layout;
         self.combo_open = false;
+        // Settings stay open across the switch: a page in the full window, a dialog in the simple one.
+        let in_dialog = self.dialogs.iter().position(|d| matches!(d, Dialog::Settings));
+        match layout {
+            Layout::Full => {
+                if let Some(i) = in_dialog {
+                    self.dialogs.remove(i);
+                    self.page = Page::Settings;
+                }
+            }
+            Layout::Simple => {
+                if self.page == Page::Settings {
+                    self.page = Page::Computers;
+                    if in_dialog.is_none() {
+                        self.dialogs.push(Dialog::Settings);
+                    }
+                }
+            }
+        }
         self.resync();
         let Some(old) = self.window else { return Task::none() };
         let (_, opened) = window::open(window_settings(layout));
@@ -216,6 +239,14 @@ impl App {
         opened
             .map(|id| Message::WindowOpened(Some(id)))
             .chain(window::close(old))
+    }
+    /// A new page of the full window starts at its top rather than where the last one was scrolled.
+    fn show_page(&mut self, page: Page) -> Task<Message> {
+        if self.page == page {
+            return Task::none();
+        }
+        self.page = page;
+        operation::snap_to(MAIN_SCROLL, operation::RelativeOffset::START)
     }
     fn refresh_host(&mut self) -> Task<Message> {
         if self.host.busy {
@@ -360,10 +391,7 @@ impl App {
                 Some(id) => self.edit_computer(Some(&id), false, ""),
                 None => Task::none(),
             },
-            Message::ShowPage(page) => {
-                self.page = page;
-                Task::none()
-            }
+            Message::ShowPage(page) => self.show_page(page),
             Message::FilterInput(value) => {
                 self.filter = value;
                 Task::none()
@@ -501,11 +529,24 @@ impl App {
                 Task::none()
             }
             Message::OpenSettings => {
-                if !self.dialogs.iter().any(|d| matches!(d, Dialog::Settings)) {
-                    self.dialogs.push(Dialog::Settings);
-                }
+                let shown = if self.layout == Layout::Full {
+                    self.show_page(Page::Settings)
+                } else {
+                    if !self.dialogs.iter().any(|d| matches!(d, Dialog::Settings)) {
+                        self.dialogs.push(Dialog::Settings);
+                    }
+                    Task::none()
+                };
                 self.combo_open = false;
-                self.refresh_host()
+                Task::batch([shown, self.refresh_host()])
+            }
+            Message::ToggleDetails(details) => {
+                if let Some(i) = self.details.iter().position(|d| *d == details) {
+                    self.details.remove(i);
+                } else {
+                    self.details.push(details);
+                }
+                Task::none()
             }
             Message::SetLayout(layout) => match self.save_preferences(|p| p.layout = layout) {
                 Ok(()) => self.apply_layout(layout),
